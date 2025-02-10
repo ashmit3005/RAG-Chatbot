@@ -1,0 +1,83 @@
+The Shinkansen (Japanese: 新幹線, [ɕiŋkaꜜɰ̃seɴ] ⓘ, lit. 'new trunk line'), colloquially known in English as the bullet train, is a network of high-speed railway lines in Japan. It was initially built to connect distant Japanese regions with Tokyo, the capital, to aid economic growth and development. Beyond long-distance travel, some sections around the largest metropolitan areas are used as a commuter rail network.[1][2] It is owned by the Japan Railway Construction, Transport and Technology Agency and operated by five Japan Railways Group companies.
+
+Starting with the Tokaido Shinkansen (515.4 km; 320.3 mi) in 1964,[3] the network has expanded to consist of 2,951.3 km (1,833.9 mi) of lines with maximum speeds of 260–320 km/h (160–200 mph), 283.5 km (176.2 mi) of Mini-shinkansen lines with a maximum speed of 130 km/h (80 mph), and 10.3 km (6.4 mi) of spur lines with Shinkansen services.[4] The network links most major cities on the islands of Honshu and Kyushu, and connects to Hakodate on the northern island of Hokkaido. An extension to Sapporo is under construction and scheduled to open in March 2031.[5] The maximum operating speed is 320 km/h (200 mph) (on a 387.5 km (241 mi) section of the Tōhoku Shinkansen).[6] Test runs have reached 443 km/h (275 mph) for conventional rail in 1996, and up to a world record 603 km/h (375 mph) for SCMaglev trains in April 2015.[7]
+
+The original Tokaido Shinkansen, connecting Tokyo, Nagoya, and Osaka, three of Japan's largest cities, is one of the world's busiest high-speed rail lines. In the one-year period preceding March 2017, it carried 159 million passengers,[8] and since its opening more than six decades ago, it has transported more than 6.4 billion total passengers.[3] At peak times, the line carries up to 16 trains per hour in each direction with 16 cars each (1,323-seat capacity and occasionally additional standing passengers) with a minimum headway of three minutes between trains.[9]
+
+The Shinkansen network of Japan had the highest annual passenger ridership (a maximum of 353 million in 2007) of any high-speed rail network until 2011, when the Chinese high-speed railway network surpassed it at 370 million passengers annually, reaching over 2.3 billion annual passengers in 2019.[10]
+
+Etymology
+Shinkansen (新幹線) in Japanese means 'new trunk line' or 'new main line', but this word is used to describe both the railway lines the trains run on and the trains themselves.[11][12] In English, the trains are also known as the bullet train. The term bullet train (弾丸列車, dangan ressha) originates from 1939, and was the initial name given to the Shinkansen project in its earliest planning stages.[13] Furthermore, the name super express (超特急, chō-tokkyū), used exclusively until 1972 for Hikari trains on the Tōkaidō Shinkansen, is used today in English-language announcements and signage.
+
+History
+
+A JNR map from the October 1964 English-language timetable, showing the then-new Tokaido Shinkansen line (in red) and conventional lines
+
+A 0 series set in front of Mount Fuji
+Japan was the first country to build dedicated railway lines for high-speed travel. Because of the mountainous terrain, the existing network consisted of 1,067 mm (3 ft 6 in) narrow-gauge lines, which generally took indirect routes and could not be adapted to higher speeds due to technical limitations of narrow-gauge rail. For example, if a standard-gauge rail has a curve with a maximum speed of 145 km/h (90 mph), the same curve on narrow-gauge rail will have a maximum allowable speed of 130 km/h (81 mph).[14] Consequently, Japan had a greater need for new high-speed lines than countries where the existing standard gauge or broad gauge rail system had more upgrade potential.
+
+Among the key people credited with the construction of the first Shinkansen are Hideo Shima, the Chief Engineer, and Shinji Sogō, the first President of Japanese National Railways (JNR) who managed to persuade politicians to back the plan. Other significant people responsible for its technical development were Tadanao Miki, Tadashi Matsudaira, and Hajime Kawanabe based at the Railway Technical Research Institute (RTRI), part of JNR. They were responsible for much of the technical development of the first line, the Tōkaidō Shinkansen. All three had worked on aircraft design during World War II.[15]
+
+Early proposals
+See also: Greater East Asia Railroad
+The popular English name bullet train is a literal translation of the Japanese term dangan ressha (弾丸列車), a nickname given to the project while it was initially discussed in the 1930s. The name stuck because of the original 0 Series Shinkansen's resemblance to a bullet and its high speed.
+
+The Shinkansen name was first formally used in 1940 for a proposed standard gauge passenger and freight line between Tokyo and Shimonoseki that would have used steam and electric locomotives with a top speed of 200 km/h (120 mph). Over the next three years, the Ministry of Railways drew up more ambitious plans to extend the line to Beijing (through a tunnel to Korea) and even Singapore, and build connections to the Trans-Siberian Railway and other trunk lines in Asia. These plans were abandoned in 1943 as Japan's position in World War II worsened. However, some construction did commence on the line; several tunnels on the present-day Shinkansen date to the war-era project.[16]
+
+Construction
+Following the end of World War II, high-speed rail was forgotten for several years while traffic of passengers and freight steadily increased on the conventional Tōkaidō Main Line along with the reconstruction of Japanese industry and economy. By the mid-1950s the Tōkaidō Line was operating at full capacity, and the Ministry of Railways decided to revisit the Shinkansen project. In 1957, Odakyu Electric Railway introduced its 3000 series SE Romancecar train, setting a world speed record of 145 km/h (90 mph) for a narrow gauge train when JNR leased a trainset in order to perform high-speed tests.[17] This train gave designers the confidence that they could safely build an even faster standard gauge train. Thus the first Shinkansen, the 0 series, was built on the success of the Romancecar.[citation needed]
+
+In the 1950s, the Japanese national attitude was that as was happening in the United States, railways would soon be outdated and replaced by air travel and highways.[18] However, Shinji Sogō, President of Japanese National Railways, insisted strongly on the possibility of high-speed rail, and the Shinkansen project was implemented.[19]
+
+Government approval came in December 1958, and construction of the first segment of the Tōkaidō Shinkansen between Tokyo and Osaka started in April 1959. The cost of constructing the Shinkansen was at first estimated at nearly 200 billion yen,[a] which was raised in the form of a government loan, railway bonds and a low-interest loan of US$80 million from the World Bank. Initial estimates, however, were understated and the actual cost was about 380 billion yen.[20] As the budget shortfall became clear in 1963, Sogo resigned to take responsibility.[21]
+
+A test facility for rolling stock, called the Kamonomiya Model Section, opened in Odawara in 1962.[22]
+
+Initial success
+
+1964 JNR Passenger Timetable, Table 1, showing shinkansen service on the New Tokaido Line
+The Tōkaidō Shinkansen began service on 1 October 1964, in time for the first Tokyo Olympics.[23] The conventional Limited Express service took six hours and 40 minutes from Tokyo to Osaka, but the Shinkansen made the trip in just four hours, shortened to three hours and ten minutes by 1965. It enabled day trips between Tokyo and Osaka, the two largest metropolises in Japan, significantly changed the style of business and life of the Japanese people, and increased new traffic demand. The service was an immediate success, reaching the 100 million passenger mark in less than three years on 13 July 1967, and one billion passengers in 1976. Sixteen-car trains were introduced for Expo '70 in Osaka. With an average of 23,000 passengers per hour in each direction in 1992, the Tōkaidō Shinkansen was the world's busiest high-speed rail line.[24] As of 2014, the train's 50th anniversary, daily passenger traffic rose to 391,000 which, spread over its 18-hour schedule, represented an average of just under 22,000 passengers per hour.[25]
+
+The first Shinkansen trains, the 0 series, ran at speeds of up to 210 km/h (130 mph), later increased to 220 km/h (137 mph). The last of these trains, with their classic bullet-nosed appearance, were retired on 30 November 2008. A driving car from one of the 0 series trains was donated by JR West to the National Railway Museum in York, United Kingdom in 2001.[26]
+
+Network expansion
+The Tōkaidō Shinkansen's rapid success prompted an extension westward to Okayama, Hiroshima and Fukuoka (the San'yō Shinkansen), which was completed in 1975.[27] Prime Minister Kakuei Tanaka was an ardent supporter of the Shinkansen, and his government proposed an extensive network paralleling most existing trunk lines. Two new lines, the Tōhoku Shinkansen and Jōetsu Shinkansen, were built following this plan. Many other planned lines were delayed or scrapped entirely as JNR slid into debt throughout the late 1970s, largely because of the high cost of building the Shinkansen network. By the early 1980s, the company was practically insolvent, leading to its privatization in 1987.
+
+Development of the Shinkansen by the privatised regional JR companies has continued, with new train models developed, each generally with its own distinctive appearance (such as the 500 series introduced by JR West). Since 2014, Shinkansen trains run regularly at speeds up to 320 km/h (200 mph) on the Tōhoku Shinkansen; only the Shanghai maglev train, China Railway High-speed networks, and the Indonesian Jakarta-Bandung High-speed railway have commercial services that operate faster.[28][29][needs update]
+
+Since 1970, development has also been underway for the Chūō Shinkansen, a planned maglev line from Tokyo to Osaka. On 21 April 2015, a seven-car L0 series maglev trainset set a world speed record of 603 km/h (375 mph).[7]
+
+Technology
+To enable high-speed operation, Shinkansen uses a range of advanced technology compared with conventional rail, achieving not only high speed but also a high standard of safety and comfort. Its success has influenced other railways in the world, demonstrating the importance and advantages of high-speed rail.
+
+Routing
+Shinkansen routes never intersect with slower, narrow-gauge conventional lines (except mini-shinkansen, which runs along these older lines). Consequently, the shinkansen is not affected by slower local or freight trains (except for Hokkaido Shinkansen while traveling through the Seikan Tunnel), and has the capacity to operate many high-speed trains punctually. In addition, shinkansen routes (excluding mini-shinkansen) are completely grade separated from roads and highways, meaning railway crossings are almost eliminated. Tracks are strictly off-limits with penalties against trespassing strictly regulated by law. The routes use tunnels and viaducts to go through and over obstacles rather than around them, with a minimum curve radius of 4,000 m (13,123 ft) (2,500 m (8,202 ft) on the oldest Tōkaidō Shinkansen).[14]
+
+Track
+
+Shinkansen standard gauge track, with welded rails to reduce vibration
+The Shinkansen uses 1,435 mm (4 ft 8+1⁄2 in) standard gauge in contrast to the 1,067 mm (3 ft 6 in) narrow gauge of most other lines in Japan. Continuous welded rail and swingnose crossing points are employed, eliminating gaps at turnouts and crossings. Long rails are used, joined by expansion joints to minimize gauge fluctuation due to thermal elongation and shrinkage.
+
+A combination of ballasted and slab track is used, with slab track exclusively employed on concrete bed sections such as viaducts and tunnels. Slab track is significantly more cost-effective in tunnel sections, since the lower track height reduces the cross-sectional area of the tunnel, reducing construction costs up to 30%.[30] However, the smaller diameter of Shinkansen tunnels, compared to some other high-speed lines, has resulted in the issue of tunnel boom becoming a concern for residents living close to tunnel portals.
+
+The slab track consists of rails, fasteners and track slabs with a cement asphalt mortar. On the roadbed and in tunnels, circular upstands, measuring 400–520 mm (16–20 inches) in diameter and 200 mm (7.9 inches) high, are located at 5-metre intervals. The prefabricated upstands are made of either reinforced concrete or pre-stressed reinforced concrete; they prevent the track slab from moving latitudinally or longitudinally. One track slab weighs approximately 5 tons and is 2,220–2,340 mm (87–92 inches) wide, 4,900–4,950 mm (193–195 inches) long and 160–200 mm (6.3–7.9 inches) thick.[31]
+
+Signal system
+
+Braking curve for the original ATC-1 used on the Tokaido Shinkansen (Vertical axis represents the speed of the train whereas the horizontal axis represents the distance.)
+
+Replica of the Shinkansen CTC as seen at the Kyoto Railway Museum
+The Shinkansen employs an ATC (Automatic Train Control) system, eliminating the need for trackside signals. It uses a comprehensive system of Automatic Train Protection.[21] Centralized traffic control manages all train operations, and all tasks relating to train movement, track, station and schedule are networked and computerized.
+
+Electrical systems
+Shinkansen uses a 25 kV AC overhead power supply (20 kV AC on Mini-shinkansen lines), to overcome the limitations of the 1,500 V direct current used on the existing electrified narrow-gauge system. Power is distributed along the train's axles to reduce the heavy axle loads under single power cars.[21] The AC frequency of the power supply for the Tokaido Shinkansen is 60 Hz.
+
+Trains
+
+Japanese loading gauge legend. Green: Shinkansen loading gauge
+Grey: Conventional loading gauge
+Blue: Rural loading gauge
+Figures in brackets are former limits.
+Shinkansen trains are electric multiple units (EMUs), offering fast acceleration, deceleration and reduced damage to the track because of the use of lighter vehicles compared to locomotives or power cars. The coaches are air-sealed to ensure stable air pressure when entering tunnels at high speed.
+
+Shinkansen trains (excluding mini-Shinkansen) are also built to a larger loading gauge compared to conventional-speed rolling stock.[32] This larger loading gauge permits wider coaches, allowing for 5-abreast seating (2+3) in Standard Class coaches, compared to the more common 4-abreast (2+2) seating usually found elsewhere. On occasions, this wider loading gauge was also used to allow 6-abreast seating (3+3) on certain trains, such as the E1 and E4 series sets. This, combined with a lack of power cars, allows for a higher passenger capacity within a shorter train length. However, since mini-Shinkansen lines are effectively track-regauged conventional lines, the conventional loading gauge for 1,067mm lines still applies on mini-Shinkansen lines.
