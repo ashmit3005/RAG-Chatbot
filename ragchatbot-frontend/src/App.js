@@ -1,6 +1,10 @@
 import React, { Component } from "react";
 import ChatHistory from "./ChatHistory";
+import FAQSection from "./FAQSection";
 import "./styles.css";
+import { Button, Switch, FormControlLabel, TextField } from "@mui/material";
+import PowerIcon from "@mui/icons-material/Power";
+import { motion } from "framer-motion";
 
 class App extends Component {
   constructor(props) {
@@ -9,28 +13,32 @@ class App extends Component {
       conversations: [],
       activeConversation: null,
       input: "",
-      darkMode: false, // Track dark mode state
+      darkMode: false,
+      attachedFile: null,
     };
   }
 
   handleSend = () => {
-    const { input, activeConversation, conversations } = this.state;
-    if (input.trim() === "") return;
+    const { input, activeConversation, conversations, attachedFile } = this.state;
+    if (input.trim() === "" && !attachedFile) return;
 
     let newConversations = [...conversations];
 
     if (activeConversation === null) {
       const newConversation = {
         id: newConversations.length,
-        name: input, // Name the conversation after the first query
-        messages: [{ text: input, sender: "user" }, { text: "This is a hardcoded response.", sender: "bot" }],
+        name: input || "New Query",
+        messages: [
+          { text: input, sender: "user", file: attachedFile },
+          { text: "This is a hardcoded response.", sender: "bot" },
+        ],
       };
       newConversations.push(newConversation);
-      this.setState({ conversations: newConversations, activeConversation: newConversation.id, input: "" });
+      this.setState({ conversations: newConversations, activeConversation: newConversation.id, input: "", attachedFile: null });
     } else {
-      newConversations[activeConversation].messages.push({ text: input, sender: "user" });
+      newConversations[activeConversation].messages.push({ text: input, sender: "user", file: attachedFile });
       newConversations[activeConversation].messages.push({ text: "This is a hardcoded response.", sender: "bot" });
-      this.setState({ conversations: newConversations, input: "" });
+      this.setState({ conversations: newConversations, input: "", attachedFile: null });
     }
   };
 
@@ -44,8 +52,12 @@ class App extends Component {
     }
   };
 
+  handleFileChange = (event) => {
+    this.setState({ attachedFile: event.target.files[0] });
+  };
+
   startNewConversation = () => {
-    this.setState({ activeConversation: null, input: "" });
+    this.setState({ activeConversation: null, input: "", attachedFile: null });
   };
 
   switchConversation = (index) => {
@@ -57,40 +69,61 @@ class App extends Component {
   };
 
   render() {
-    const { conversations, activeConversation, input, darkMode } = this.state;
+    const { conversations, activeConversation, input, darkMode, attachedFile } = this.state;
     const currentMessages = activeConversation !== null ? conversations[activeConversation].messages : [];
 
     return (
       <div className={`app-container ${darkMode ? "dark-mode" : "light-mode"}`}>
-        <button className="toggle-mode-btn" onClick={this.toggleDarkMode}>
-          {darkMode ? "Light Mode" : "Dark Mode"}
-        </button>
-        <div className="chat-layout">
-          <ChatHistory
-            conversations={conversations}
-            switchConversation={this.switchConversation}
-            startNewConversation={this.startNewConversation}
+        <header className="app-header">
+          <PowerIcon className="app-logo" />
+          <h1>PowerWise</h1>
+          <p>A Domain-Knowledgeable Chatbot in Power Quality</p>
+          <FormControlLabel
+            control={<Switch checked={darkMode} onChange={this.toggleDarkMode} />}
+            label="Dark Mode"
+            className="toggle-switch"
           />
-          <div className="chat-container">
+        </header>
+
+        <div className="chat-layout">
+          <ChatHistory conversations={conversations} switchConversation={this.switchConversation} startNewConversation={this.startNewConversation} />
+          
+          <motion.div className="chat-container">
             <div className="chat-window">
               {currentMessages.map((msg, index) => (
-                <div key={index} className={msg.sender === "user" ? "user-msg" : "bot-msg"}>
+                <motion.div 
+                  key={index}
+                  className={msg.sender === "user" ? "user-msg" : "bot-msg"}
+                  initial={{ opacity: 0, x: msg.sender === "user" ? 50 : -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   {msg.text}
-                </div>
+                  {msg.file && (
+                    <p className="file-attachment">📎 {msg.file.name}</p>
+                  )}
+                </motion.div>
               ))}
             </div>
+
             <div className="input-area">
-              <input
-                type="text"
+              <TextField
+                multiline
+                minRows={1}
+                maxRows={5}
+                fullWidth
                 placeholder="Type your query..."
                 value={input}
                 onChange={this.handleInputChange}
                 onKeyPress={this.handleKeyPress}
+                className="chat-input"
               />
-              <button onClick={this.handleSend}>Send</button>
-              <input type="file" className="file-upload" />
+              <input type="file" onChange={this.handleFileChange} className="file-upload" />
+              <Button variant="contained" onClick={this.handleSend} className="send-button">Send</Button>
             </div>
-          </div>
+          </motion.div>
+
+          <FAQSection />
         </div>
       </div>
     );
