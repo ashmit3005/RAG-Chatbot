@@ -5,25 +5,24 @@ from langchain.chains import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from transformers import pipeline 
+import os
 
 
 def load_and_chunk_documents():
-    file_paths = ['carss.txt', 'trainss.txt'] 
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_paths = [os.path.join(current_dir, f) for f in ['carss.txt', 'trainss.txt']]
     documents = []
-
 
     for file_path in file_paths:
         try:
-            
             loader = TextLoader(file_path, encoding='utf-8')
-            documents.extend(loader.load()) 
+            documents.extend(loader.load())
         except Exception as e:
             print(f"Error loading file {file_path}: {e}")
     
     if not documents:
         raise RuntimeError("No documents loaded. Check file paths and content.")
 
-    
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     return text_splitter.split_documents(documents)
 

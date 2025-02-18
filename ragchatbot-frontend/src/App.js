@@ -18,27 +18,76 @@ class App extends Component {
     };
   }
 
-  handleSend = () => {
+  handleSend = async () => {
     const { input, activeConversation, conversations, attachedFile } = this.state;
     if (input.trim() === "" && !attachedFile) return;
 
     let newConversations = [...conversations];
+    const userMessage = { text: input, sender: "user", file: attachedFile };
 
-    if (activeConversation === null) {
-      const newConversation = {
-        id: newConversations.length,
-        name: input || "New Query",
-        messages: [
-          { text: input, sender: "user", file: attachedFile },
-          { text: "This is a hardcoded response.", sender: "bot" },
-        ],
-      };
-      newConversations.push(newConversation);
-      this.setState({ conversations: newConversations, activeConversation: newConversation.id, input: "", attachedFile: null });
-    } else {
-      newConversations[activeConversation].messages.push({ text: input, sender: "user", file: attachedFile });
-      newConversations[activeConversation].messages.push({ text: "This is a hardcoded response.", sender: "bot" });
-      this.setState({ conversations: newConversations, input: "", attachedFile: null });
+    try {
+        // Add user message immediately
+        if (activeConversation === null) {
+            const newConversation = {
+                id: newConversations.length,
+                name: input || "New Query",
+                messages: [userMessage],
+            };
+            newConversations.push(newConversation);
+            this.setState({ 
+                conversations: newConversations, 
+                activeConversation: newConversation.id, 
+                input: "" 
+            });
+        } else {
+            newConversations[activeConversation].messages.push(userMessage);
+            this.setState({ conversations: newConversations, input: "" });
+        }
+
+        // Log the request for debugging
+        console.log('Sending request:', input);
+        
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: input }),
+        });
+
+        const data = await response.json();
+        console.log('Received response:', data); // Add this line for debugging
+        
+        // Add bot response
+        const botMessage = { 
+            text: data.response || "No response from server", 
+            sender: "bot" 
+        };
+        if (activeConversation === null) {
+            newConversations[newConversations.length - 1].messages.push(botMessage);
+        } else {
+            newConversations[activeConversation].messages.push(botMessage);
+        }
+        
+        this.setState({ 
+            conversations: newConversations,
+            attachedFile: null
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        const errorMessage = { 
+            text: "Sorry, there was an error processing your request.", 
+            sender: "bot" 
+        };
+        if (activeConversation === null) {
+            newConversations[newConversations.length - 1].messages.push(errorMessage);
+        } else {
+            newConversations[activeConversation].messages.push(errorMessage);
+        }
+        this.setState({ 
+            conversations: newConversations,
+            attachedFile: null
+        });
     }
   };
 
