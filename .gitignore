@@ -1,0 +1,11 @@
+ # Virtual environment
+RAG/Lib/
+venv/
+*.dll
+*.lib
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
