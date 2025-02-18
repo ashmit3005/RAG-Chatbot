@@ -16,3 +16,37 @@ __pycache__/
 
 # Environment
 .env
+
+# Torch specific
+**/torch/lib/
+**/torch_cpu.dll
+**/dnnl.lib
+**/libtorch_cpu.dylib
+**/libtorch_cpu.so
+**/libtorch_cpu.dll
+**/libtorch_cpu.lib
+**/libtorch_cpu.dylib
+**/libtorch_cpu.so
+
+# Model files and caches
+**/models/
+**/.cache/
+**/transformers/
+**/sentence_transformers/
+**/faiss_indexes/
+
+# Logs and temp files
+*.log
+*.temp
+.DS_Store
+
+# Frontend
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/yarn.lock
+**/package-lock.json    
+
+
+
