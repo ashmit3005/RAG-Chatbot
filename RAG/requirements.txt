@@ -6,3 +6,6 @@ transformers
 faiss-cpu
 sentence-transformers
 langchain-huggingface 
+textblob
+language-tool-python
+spacy

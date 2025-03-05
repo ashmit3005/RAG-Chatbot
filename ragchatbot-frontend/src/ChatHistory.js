@@ -35,13 +35,14 @@ const ChatHistory = ({ conversations, switchConversation, startNewConversation, 
               <div
                 key={index}
                 onClick={() => switchConversation(index)}
-                className={`p-2 rounded-md cursor-pointer transition-all ${
+                className={`p-2 rounded-md cursor-pointer transition-all truncate ${
                   selectedConversation === index
                     ? "bg-[var(--btn-bg)] text-[var(--btn-text)]"
                     : "hover:bg-gray-500"
                 }`}
+                title={conv.name}  // Add tooltip for full title
               >
-                {conv.name}
+                {conv.name || `Chat ${index + 1}`}
               </div>
             ))}
           </div>
