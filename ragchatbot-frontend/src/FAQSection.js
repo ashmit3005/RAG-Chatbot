@@ -7,21 +7,23 @@ const faqs = [
   { question: "What are the early warning signs of cable faults?", article: "Signs include abnormal heating, intermittent voltage drops, and unexplained circuit breaker trips. Monitoring these symptoms can help prevent full-scale failure." },
   { question: "How can incipient faults be detected?", article: "Advanced techniques like Partial Discharge Analysis, Thermal Imaging, and Predictive Maintenance Algorithms are commonly used to detect incipient faults." },
 ];
-
 const FAQSection = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
 
   return (
-    <div className="faq-section">
-      <h3>FAQs</h3>
-      {faqs.map((faq, index) => (
-        <div key={index} className="faq-item" onClick={() => setSelectedArticle(faq.article)}>
-          {faq.question}
-        </div>
-      ))}
-      {selectedArticle && <p className="faq-article">{selectedArticle}</p>}
+    <div className="faq-container">
+      <h2 className="faq-header">Frequently Asked Questions</h2>
+      <div className="faq-list">
+        {faqs.map((faq, index) => (
+          <button key={index} className="faq-item" onClick={() => setSelectedArticle(faq.article)}>
+            {faq.question}
+          </button>
+        ))}
+      </div>
+      {selectedArticle && <div className="faq-article">{selectedArticle}</div>}
     </div>
   );
 };
+
 
 export default FAQSection;
