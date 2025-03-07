@@ -1,10 +1,10 @@
-from langchain_community.document_loaders import TextLoader
+from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from transformers import pipeline 
+from transformers import pipeline
 from textblob import TextBlob
 from language_tool_python import LanguageTool, utils
 import os
@@ -12,16 +12,16 @@ import spacy
 
 def load_and_chunk_documents():
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_paths = [os.path.join(current_dir, f) for f in ['carss.txt', 'trainss.txt']]
+    file_paths = [os.path.join(current_dir, f) for f in ['carss.pdf', 'trainss.pdf']]
     documents = []
 
     for file_path in file_paths:
         try:
-            loader = TextLoader(file_path, encoding='utf-8')
+            loader = PyPDFLoader(file_path)
             documents.extend(loader.load())
         except Exception as e:
             print(f"Error loading file {file_path}: {e}")
-    
+
     if not documents:
         raise RuntimeError("No documents loaded. Check file paths and content.")
 
@@ -30,14 +30,14 @@ def load_and_chunk_documents():
 
 
 def generate_embeddings(chunks):
-    
+
     embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     embeddings = embedding_model.embed_documents([chunk.page_content for chunk in chunks])
     return embedding_model, embeddings
 
 
 def create_vector_store(chunks, embedding_model):
-  
+
     vectorstore = FAISS.from_documents(documents=chunks, embedding=embedding_model)
     return vectorstore
 
@@ -52,13 +52,13 @@ def retrieve_relevant_context(vectorstore, question, k=3):
 def process_query(question):
     nlp = spacy.load("en_core_web_sm")
     doc = nlp(question)
-    
+
     # Extract key entities and technical terms
     entities = [ent.text for ent in doc.ents]
-    
+
     # Extract key noun phrases
     noun_phrases = [chunk.text for chunk in doc.noun_chunks]
-    
+
     # Enhance original query with extracted information
     processed_query = question
     return processed_query, entities, noun_phrases
@@ -70,23 +70,23 @@ def validate_response(response):
 
     # Corrected response
     corrected_response = utils.correct(response, matches)
-    
+
     # Use TextBlob for sentiment and subjectivity analysis
     blob = TextBlob(response)
-    
+
     # Create validation report
     validation = {
         "grammar_error_count": len(matches),
         "corrected_text": corrected_response
     }
-    
+
     return corrected_response, validation
 
 
 def build_rag_pipeline(vectorstore):
-  
+
     qa_pipeline = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
-    
+
     def qa_function(question):
         # Process query
         processed_query, entities, noun_phrases = process_query(question)
@@ -124,16 +124,16 @@ def test_rag_pipeline(rag_pipeline):
 
 if __name__ == "__main__":
     try:
-   
+
         chunks = load_and_chunk_documents()
-        
-        
+
+
         embedding_model, embeddings = generate_embeddings(chunks)
 
- 
+
         vectorstore = create_vector_store(chunks, embedding_model)
 
-        
+
         rag_pipeline = build_rag_pipeline(vectorstore)
         test_rag_pipeline(rag_pipeline)
     except Exception as e:
