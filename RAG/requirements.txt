@@ -9,3 +9,5 @@ langchain-huggingface
 textblob
 language-tool-python
 spacy
+torch 
+pypdf

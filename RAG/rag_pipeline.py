@@ -1,58 +1,96 @@
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
-
-from transformers import pipeline 
+from transformers import pipeline
 import os
+import glob
 
 
 def load_and_chunk_documents():
+    # Get path to Documents Database folder
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_paths = [os.path.join(current_dir, f) for f in ['carss.txt', 'trainss.txt']]
+    database_dir = os.path.join(current_dir, 'Documents Database')
+    
+    # Find all PDF files
+    pdf_files = glob.glob(os.path.join(database_dir, '*.pdf'))
     documents = []
 
-    for file_path in file_paths:
+    # Load each PDF
+    for file_path in pdf_files:
         try:
-            loader = TextLoader(file_path, encoding='utf-8')
+            loader = PyPDFLoader(file_path)
             documents.extend(loader.load())
+            print(f"Successfully loaded: {file_path}")
         except Exception as e:
-            print(f"Error loading file {file_path}: {e}")
+            print(f"Error loading PDF file {file_path}: {e}")
     
     if not documents:
-        raise RuntimeError("No documents loaded. Check file paths and content.")
+        raise RuntimeError("No documents loaded. Check if there are PDF files in the Documents Database directory.")
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    return text_splitter.split_documents(documents)
+    # Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
+    )
+    chunks = text_splitter.split_documents(documents)
+    print(f"Created {len(chunks)} chunks from {len(pdf_files)} documents")
+    return chunks
 
 
 def generate_embeddings(chunks):
-    
-    embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    embeddings = embedding_model.embed_documents([chunk.page_content for chunk in chunks])
-    return embedding_model, embeddings
+    embedding_model = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    return embedding_model, None
 
 
 def create_vector_store(chunks, embedding_model):
-  
     vectorstore = FAISS.from_documents(documents=chunks, embedding=embedding_model)
     return vectorstore
 
 
 def build_rag_pipeline(vectorstore):
-  
-    qa_pipeline = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
+    # Initialize a simpler QA pipeline
+    qa_model = pipeline(
+        "question-answering",
+        model="deepset/roberta-base-squad2",
+        tokenizer="deepset/roberta-base-squad2"
+    )
     
     def qa_function(question):
-       
-        relevant_docs = vectorstore.similarity_search(question, k=1)  
-        if relevant_docs:
-            context = relevant_docs[0].page_content
-            result = qa_pipeline(question=question, context=context)
-            return result['answer']
-        else:
-            return "No relevant documents found."
+        try:
+            # Get relevant documents
+            relevant_docs = vectorstore.similarity_search(
+                question,
+                k=3
+            )
+            
+            if not relevant_docs:
+                return "I couldn't find any relevant information in the documents."
+            
+            # Combine contexts
+            context = " ".join([doc.page_content for doc in relevant_docs])
+            
+            # Get answer using QA pipeline
+            result = qa_model(
+                question=question,
+                context=context,
+                max_answer_len=100
+            )
+            
+            answer = result['answer'].strip()
+            
+            # If answer is too short or just punctuation, return relevant context
+            if len(answer) < 3 or answer in '.,!?':
+                return relevant_docs[0].page_content[:200] + "..."
+                
+            return answer
+            
+        except Exception as e:
+            print(f"Error in QA pipeline: {e}")
+            return "Sorry, I encountered an error while processing your question."
 
     return qa_function
 
