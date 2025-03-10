@@ -8,11 +8,10 @@ app = Flask(__name__)
 CORS(app)
 
 # Configure upload settings
-current_dir = os.path.dirname(os.path.abspath(__file__))  # Gets the RAG directory path
+current_dir = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(current_dir, 'Uploaded Documents')
 ALLOWED_EXTENSIONS = {'pdf'}
 
-# Debug print to verify the path
 print(f"Setting upload folder to: {UPLOAD_FOLDER}")
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -24,10 +23,10 @@ def allowed_file(filename):
 # Initialize global RAG pipeline
 global_rag_pipeline = None
 
-def initialize_rag_pipeline():
+def initialize_rag_pipeline(recent_files=None):
     global global_rag_pipeline
     try:
-        chunks = load_and_chunk_documents()
+        chunks = load_and_chunk_documents(recent_files=recent_files)
         embedding_model, embeddings = generate_embeddings(chunks)
         vectorstore = create_vector_store(chunks, embedding_model)
         global_rag_pipeline = build_rag_pipeline(vectorstore)
@@ -63,7 +62,7 @@ def chat():
             
             for key in file_keys:
                 file = request.files[key]
-                if file and file.filename:
+                if file and file.filename and allowed_file(file.filename):
                     try:
                         filename = secure_filename(file.filename)
                         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -74,11 +73,11 @@ def chat():
                         print(f"Error saving file {file.filename}: {e}")
                         return jsonify({"error": f"Error saving file {file.filename}: {str(e)}"}), 500
         
-        # If files were uploaded, reinitialize the pipeline
+        # If files were uploaded, reinitialize the pipeline with recent files
         if uploaded_files:
             print(f"New files uploaded: {uploaded_files}")
-            initialize_rag_pipeline()
-        
+            initialize_rag_pipeline(recent_files=uploaded_files)
+            
         # Initialize pipeline if it's not already initialized
         if global_rag_pipeline is None:
             initialize_rag_pipeline()

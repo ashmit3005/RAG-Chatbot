@@ -7,35 +7,55 @@ import os
 import glob
 
 
-def load_and_chunk_documents():
-    # Get path to Documents Database folder
+def load_and_chunk_documents(recent_files=None):
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    uploaded_dir = os.path.join(current_dir, 'Uploaded Documents')
     database_dir = os.path.join(current_dir, 'Documents Database')
     
-    # Find all PDF files
-    pdf_files = glob.glob(os.path.join(database_dir, '*.pdf'))
     documents = []
 
-    # Load each PDF
-    for file_path in pdf_files:
+    # Load from Documents Database
+    database_files = glob.glob(os.path.join(database_dir, '*.pdf'))
+    for file_path in database_files:
         try:
             loader = PyPDFLoader(file_path)
-            documents.extend(loader.load())
-            print(f"Successfully loaded: {file_path}")
+            docs = loader.load()
+            # Add metadata for database documents
+            for doc in docs:
+                doc.metadata['source'] = 'database'
+                doc.metadata['is_recent'] = False
+            documents.extend(docs)
+            print(f"Loaded database file: {file_path}")
         except Exception as e:
-            print(f"Error loading PDF file {file_path}: {e}")
+            print(f"Error loading database file {file_path}: {e}")
+
+    # Load from Uploaded Documents
+    uploaded_files = glob.glob(os.path.join(uploaded_dir, '*.pdf'))
+    for file_path in uploaded_files:
+        try:
+            loader = PyPDFLoader(file_path)
+            docs = loader.load()
+            filename = os.path.basename(file_path)
+            # Add metadata for uploaded documents
+            for doc in docs:
+                doc.metadata['source'] = 'uploaded'
+                doc.metadata['is_recent'] = recent_files and filename in recent_files
+            documents.extend(docs)
+            print(f"Loaded uploaded file: {file_path} {'(recent)' if doc.metadata['is_recent'] else ''}")
+        except Exception as e:
+            print(f"Error loading uploaded file {file_path}: {e}")
     
     if not documents:
-        raise RuntimeError("No documents loaded. Check if there are PDF files in the Documents Database directory.")
+        raise RuntimeError("No documents loaded from either directory.")
 
-    # Split documents into chunks
+    # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
         separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Created {len(chunks)} chunks from {len(pdf_files)} documents")
+    print(f"Created {len(chunks)} chunks from {len(database_files) + len(uploaded_files)} documents")
     return chunks
 
 
