@@ -1,10 +1,9 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-from transformers import pipeline
 import os
 import glob
+import openai
 
 
 def load_and_chunk_documents(recent_files=None):
@@ -72,12 +71,10 @@ def create_vector_store(chunks, embedding_model):
 
 
 def build_rag_pipeline(vectorstore):
-    # Initialize a simpler QA pipeline
-    qa_model = pipeline(
-        "question-answering",
-        model="deepset/roberta-base-squad2",
-        tokenizer="deepset/roberta-base-squad2"
-    )
+    # Initialize OpenAI client
+    # Make sure to set OPENAI_API_KEY environment variable or pass it directly
+    
+    client = openai.OpenAI()  # Will use OPENAI_API_KEY from environment
     
     def qa_function(question):
         try:
@@ -93,17 +90,21 @@ def build_rag_pipeline(vectorstore):
             # Combine contexts
             context = " ".join([doc.page_content for doc in relevant_docs])
             
-            # Get answer using QA pipeline
-            result = qa_model(
-                question=question,
-                context=context,
-                max_answer_len=100
+            # Use OpenAI API for question answering
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # You can change to other models like "gpt-4" if needed
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that answers questions based on the provided context. Only use information from the context to answer."},
+                    {"role": "user", "content": f"Context: {context}\n\nQuestion: {question}\n\nAnswer:"}
+                ],
+                max_tokens=150,
+                temperature=0.3
             )
             
-            answer = result['answer'].strip()
+            answer = response.choices[0].message.content.strip()
             
-            # If answer is too short or just punctuation, return relevant context
-            if len(answer) < 3 or answer in '.,!?':
+            # If answer is too short, return relevant context
+            if len(answer) < 3:
                 return relevant_docs[0].page_content[:200] + "..."
                 
             return answer
