@@ -106,7 +106,9 @@ def build_rag_pipeline(vectorstore, existing_history=None):
             
             # Construct messages for the API call
             messages = [
-                {"role": "system", "content": "You are a helpful assistant that answers questions based on the provided context. Use information from the context and remember previous parts of the conversation when answering."}
+                {"role": "system", 
+                 "content": "You are a helpful assistant that answers questions based ONLY on the provided context. \
+                Use information ONLY from the context and remember previous parts of the conversation when answering."}
             ]
             
             # Add conversation history (limited to last 10 exchanges to manage token limit)
@@ -118,10 +120,10 @@ def build_rag_pipeline(vectorstore, existing_history=None):
             
             # Use OpenAI API for question answering
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # You can change to other models like "gpt-4" if needed
+                model="gpt-4o",  # Best option for context adherence
                 messages=messages,
-                max_tokens=150,
-                temperature=0.3
+                max_tokens=800,
+                temperature=0.1
             )
             
             answer = response.choices[0].message.content.strip()
