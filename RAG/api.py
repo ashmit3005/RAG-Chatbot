@@ -1,11 +1,12 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from rag_pipeline import load_and_chunk_documents, generate_embeddings, create_vector_store, build_rag_pipeline
 
 app = Flask(__name__)
 CORS(app)
+app.secret_key = os.urandom(24)  # For session management
 
 # Configure upload settings
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,16 +21,18 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 def allowed_file(filename):
     return filename.lower().endswith('.pdf')
 
-# Initialize global RAG pipeline
+# Global variables for the RAG pipeline and conversation history
 global_rag_pipeline = None
+global_conversation_history = []
 
 def initialize_rag_pipeline(recent_files=None):
-    global global_rag_pipeline
+    global global_rag_pipeline, global_conversation_history
     try:
         chunks = load_and_chunk_documents(recent_files=recent_files)
         embedding_model, embeddings = generate_embeddings(chunks)
         vectorstore = create_vector_store(chunks, embedding_model)
-        global_rag_pipeline = build_rag_pipeline(vectorstore)
+        # Pass the existing conversation history to maintain context
+        global_rag_pipeline = build_rag_pipeline(vectorstore, global_conversation_history)
     except Exception as e:
         print(f"Error initializing RAG pipeline: {e}")
         global_rag_pipeline = None
@@ -39,7 +42,7 @@ initialize_rag_pipeline()
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    global global_rag_pipeline
+    global global_rag_pipeline, global_conversation_history
     
     try:
         # Debug logging
@@ -90,6 +93,8 @@ def chat():
             response = f"Successfully uploaded files: {', '.join(uploaded_files)}"
         else:
             response = global_rag_pipeline(message) if message else "Files uploaded successfully"
+            # Update our global conversation history from the pipeline's internal state
+            # (This is handled automatically now as the history is shared by reference)
         
         return jsonify({
             "response": response,
@@ -104,4 +109,4 @@ if __name__ == '__main__':
     # Ensure upload directory exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     print(f"Upload directory set to: {UPLOAD_FOLDER}")
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=True)
