@@ -5,6 +5,42 @@ from langchain_openai import OpenAIEmbeddings
 import os
 import glob
 import openai
+import re
+import string
+
+
+def preprocess_text(text):
+    """
+    Preprocess text to improve quality for embedding and retrieval.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove URLs
+    text = re.sub(r'http[s]?://\S+', '', text)
+    
+    # Remove email addresses
+    text = re.sub(r'\S+@\S+', '', text)
+    
+    # Remove special characters but keep periods, question marks, etc.
+    text = re.sub(r'[^\w\s.,?!;:()\-\'"]', ' ', text)
+    
+    # Remove extra punctuation 
+    text = re.sub(r'([.,!?;:])\1+', r'\1', text)
+    
+    # Fix spacing around punctuation
+    text = re.sub(r'\s([.,!?;:])', r'\1', text)
+    
+    # Clean up 
+    text = text.strip()
+    
+    return text
 
 
 def load_and_chunk_documents(recent_files=None):
@@ -24,6 +60,8 @@ def load_and_chunk_documents(recent_files=None):
             for doc in docs:
                 doc.metadata['source'] = 'database'
                 doc.metadata['is_recent'] = False
+                # Apply preprocessing to document content
+                doc.page_content = preprocess_text(doc.page_content)
             documents.extend(docs)
             print(f"Loaded database file: {file_path}")
         except Exception as e:
@@ -40,6 +78,8 @@ def load_and_chunk_documents(recent_files=None):
             for doc in docs:
                 doc.metadata['source'] = 'uploaded'
                 doc.metadata['is_recent'] = recent_files and filename in recent_files
+                # Apply preprocessing to document content
+                doc.page_content = preprocess_text(doc.page_content)
             documents.extend(docs)
             print(f"Loaded uploaded file: {file_path} {'(recent)' if doc.metadata['is_recent'] else ''}")
         except Exception as e:
@@ -60,8 +100,9 @@ def load_and_chunk_documents(recent_files=None):
 
 
 def generate_embeddings(chunks):
+    # Make sure query text is preprocessed the same way for consistency
     embedding_model = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Using OpenAI's most powerful embedding model
+        model="text-embedding-3-large",  # Using OpenAI's most powerful embedding model
     )
     return embedding_model, None
 

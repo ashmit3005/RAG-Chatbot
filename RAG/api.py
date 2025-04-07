@@ -109,4 +109,4 @@ if __name__ == '__main__':
     # Ensure upload directory exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     print(f"Upload directory set to: {UPLOAD_FOLDER}")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
