@@ -29,7 +29,7 @@ def initialize_rag_pipeline(recent_files=None):
     global global_rag_pipeline, global_conversation_history
     try:
         chunks = load_and_chunk_documents(recent_files=recent_files)
-        embedding_model, embeddings = generate_embeddings(chunks)
+        embedding_model = generate_embeddings(chunks)
         vectorstore = create_vector_store(chunks, embedding_model)
         # Pass the existing conversation history to maintain context
         global_rag_pipeline = build_rag_pipeline(vectorstore, global_conversation_history)
@@ -83,26 +83,37 @@ def chat():
             
         # Initialize pipeline if it's not already initialized
         if global_rag_pipeline is None:
+            print("Initializing RAG pipeline")
             initialize_rag_pipeline()
             
         if global_rag_pipeline is None:
+            print("Failed to initialize RAG pipeline")
             return jsonify({"error": "Failed to initialize RAG pipeline"}), 500
             
         # Process the query (if no message but files uploaded, acknowledge the upload)
+        print(f"Processing message: '{message}'")
         if not message and uploaded_files:
             response = f"Successfully uploaded files: {', '.join(uploaded_files)}"
         else:
-            response = global_rag_pipeline(message) if message else "Files uploaded successfully"
-            # Update our global conversation history from the pipeline's internal state
-            # (This is handled automatically now as the history is shared by reference)
+            try:
+                response = global_rag_pipeline(message) if message else "Files uploaded successfully"
+                print(f"Generated response: '{response[:50]}...'") # Print first 50 chars of response
+            except Exception as e:
+                print(f"Error generating response: {e}")
+                return jsonify({"error": f"Error generating response: {str(e)}"}), 500
         
-        return jsonify({
+        # Create the response data
+        response_data = {
             "response": response,
             "uploaded_files": uploaded_files
-        })
+        }
+        print("Sending response")
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"Error processing request: {e}")
+        import traceback
+        traceback.print_exc()  # Print full stack trace
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

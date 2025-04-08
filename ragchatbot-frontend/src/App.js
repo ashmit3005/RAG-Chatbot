@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import ChatHistory from "./ChatHistory";
 import FAQSection from "./FAQSection";
 import "./styles.css";
-import { Button, Switch, FormControlLabel, TextField } from "@mui/material";
+import { Switch, TextField } from "@mui/material";
 import PowerIcon from "@mui/icons-material/Power";
 import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -144,7 +144,10 @@ class App extends Component {
       }
 
       const data = await response.json();
-      this.addMessage("bot", data.response);
+      
+      // Process the response text to convert newlines to <br> elements
+      const formattedResponse = data.response.replace(/\n/g, '<br>').replace(/•/g, '&bull;');
+      this.addMessage("bot", formattedResponse);
       
       // Clear attached files after successful send
       this.setState({ attachedFiles: [] });
@@ -174,7 +177,7 @@ class App extends Component {
       alert(`Maximum ${this.state.maxFiles} files allowed`);
       return;
     }
-    
+
     this.setState(prevState => ({
       attachedFiles: [...prevState.attachedFiles, ...files]
     }));
@@ -242,13 +245,11 @@ class App extends Component {
             selectedConversation={activeConversation} 
             toggleSidebar={(isOpen) => this.setState({ isOpen })} 
           />
-
           <motion.div className={"chat-container"}>
             <div className="chat-header flex items-center gap-2 p-4">
               <PowerIcon className="text-[var(--text-color)]" fontSize="large" />
               <h1 className="text-4xl font-bold text-[var(--text-color)]">PowerWise - A Power Quality ChatBot</h1>
             </div>
-
             <div className="chat-window p-4 mb-4 mx-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-y-auto">
               {currentMessages.map((msg, index) => (
                 <motion.div
@@ -263,11 +264,22 @@ class App extends Component {
                       ? "bg-purple-600 text-white ml-auto" 
                       : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 mr-auto"
                   }`}>
-                    {msg.text}
+                    {msg.sender === "bot" ? (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: msg.text }} 
+                        className="bot-message"
+                        style={{
+                          lineHeight: "1.5",
+                          overflow: "auto"
+                        }}
+                      />
+                    ) : (
+                      msg.text
+                    )}
                     {msg.files && msg.files.length > 0 && (
                       <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/20">
-                        {msg.files.map((file, index) => (
-                          <div key={index} className="flex items-center gap-2">
+                        {msg.files.map((file, fileIndex) => (
+                          <div key={fileIndex} className="flex items-center gap-2">
                             <div className="w-6 h-6 bg-purple-500 rounded-lg flex items-center justify-center">
                               <AttachFileIcon className="text-white" fontSize="small" />
                             </div>
@@ -295,7 +307,6 @@ class App extends Component {
                 </motion.div>
               )}
             </div>
-
             <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg w-[95%] bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-auto">
               {/* Show attached files above input if present */}
               {attachedFiles.length > 0 && (
@@ -313,7 +324,7 @@ class App extends Component {
                           const newFiles = [...attachedFiles];
                           newFiles.splice(index, 1);
                           this.setState({ attachedFiles: newFiles });
-                        }}
+                        }} 
                         className={`${
                           darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                         } ml-2`}
@@ -326,7 +337,6 @@ class App extends Component {
                   ))}
                 </div>
               )}
-              
               {/* Input area and buttons */}
               <div className="flex items-center gap-2">
                 <div className="flex-grow px-2 w-[90%]">
@@ -342,7 +352,7 @@ class App extends Component {
                     className="chat-input bg-transparent border-none focus:ring-0 focus:outline-none w-full text-[var(--text-color)]"
                     InputProps={{
                       disableUnderline: true,
-                      style: { 
+                      style: {
                         color: 'var(--text-color)',
                         padding: '12px 16px',
                         fontSize: '1rem',
@@ -404,7 +414,6 @@ class App extends Component {
               </div>
             </div>
           </motion.div>
-
           <FAQSection />
         </div>
       </div>
