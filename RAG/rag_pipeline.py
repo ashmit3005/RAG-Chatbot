@@ -1,8 +1,13 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_openai import OpenAIEmbeddings
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+from langchain_core.runnables import RunnableWithMessageHistory
 import os
 import glob
 import openai
@@ -11,6 +16,11 @@ from nltk import pos_tag, ne_chunk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+
+contextualize_q_system_prompt = """
+            Given a chat history and the latest user question which might reference context in the chat history,
+            formulate a standalone question which can be understood without the chat history. Do NOT answer the 
+            question, just reforumlate it if needed and otherwise return as is."""
 
 # Helper function to convert NLTK POS tags to WordNet POS tags
 def get_wordnet_pos(tag):
@@ -214,7 +224,6 @@ def create_vector_store(chunks, embedding_model):
     vectorstore = FAISS.from_documents(documents=chunks, embedding=embedding_model)
     return vectorstore
 
-
 def format_response(text):
     """
     Improve the formatting of the response text for better readability
@@ -255,141 +264,79 @@ def format_response(text):
     return text.strip()
 
 
-def build_rag_pipeline(vectorstore, existing_history=None):
-    # Initialize OpenAI client
-    # Make sure to set OPENAI_API_KEY environment variable or pass it directly
+def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
+    # Initialize llm
+    llm = ChatOpenAI(
+        model=llm, 
+        temperature=0.3
+    )
     
-    client = openai.OpenAI()  # Will use OPENAI_API_KEY from environment
+    contextualize_q_prompt = ChatPromptTemplate.from_messages([
+        ("system", contextualize_q_system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ])
+
+    # Create a retriever with history awareness
+    history_aware_retriever = create_history_aware_retriever(
+        llm, 
+        vectorstore.as_retriever(),
+        contextualize_q_prompt,
+    )
+
+    # Create the question-answering chain
+    qa_system_prompt = """You are a helpful assistant that provides information based ONLY on the documents in your knowledge base.
+    Use ONLY the following pieces of retrieved context to answer the question and only include outside information if it is explicitly mentioned in the context
+    and relevant to the question and document content.
+    If you don't know the answer or if the context doesn't contain relevant information, say you don't have enough information to answer.
+    Remain conversational and engaging in your responses while keeping the answers concise and relevant.
+
+    Context: {context}"""
+
+    qa_prompt = ChatPromptTemplate.from_messages([
+        ("system", qa_system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ])
+
+    # Create the document chain
+    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
     
-    # Initialize conversation history, using existing history if provided
-    conversation_history = existing_history if existing_history is not None else []
+    # Create the retrieval chain
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
     
-    def qa_function(question, reset_conversation=False):
-        nonlocal conversation_history
-        
-        # Reset conversation if requested
+    # Set up conversation history storage
+    store = {}
+
+    def get_session_history(session_id):
+        if session_id not in store:
+            store[session_id] = ChatMessageHistory()
+        return store[session_id]
+    
+    # Create a stateful conversational chain
+    conversational_rag_chain = RunnableWithMessageHistory(
+        rag_chain,
+        get_session_history,
+        input_messages_key="input",
+        history_messages_key="chat_history",
+        output_messages_key="answer",
+    )
+
+    # Create a wrapper function to match your existing interface
+    def qa_function(question, reset_conversation=False, session_id="default"):
         if reset_conversation:
-            conversation_history.clear()
+            if session_id in store:
+                store[session_id].clear()
             return "Conversation history has been reset."
         
-        try:
-            # Preprocess the user question for better matching
-            processed_question, entities = preprocess_text(question, is_document=False)
-
-            # Extract entity mentions for enhanced retrieval
-            entity_mentions = []
-            has_entities = False
-            for entity_type, entity_list in entities.items():
-                if entity_list:  # Check if the list is not empty
-                    entity_mentions.extend(entity_list)
-                    has_entities = True
-
-            # Use a hybrid retrieval approach
-            k_docs = 3  # Number of documents to retrieve
-            
-            if has_entities:
-                # Entity-based retrieval - Use more specific search when entities are present
-                entity_query = " ".join(entity_mentions)
-                entity_docs = vectorstore.similarity_search(
-                    entity_query,
-                    k=k_docs
-                )
-                
-                # Regular similarity search with the processed question
-                similarity_docs = vectorstore.similarity_search(
-                    processed_question,
-                    k=k_docs
-                )
-                
-                # Combine and deduplicate results (prioritizing entity matches)
-                seen_docs = set()
-                relevant_docs = []
-                
-                # First add entity-based results
-                for doc in entity_docs:
-                    doc_id = hash(doc.page_content)
-                    if doc_id not in seen_docs:
-                        seen_docs.add(doc_id)
-                        # Add metadata to indicate this was from entity search
-                        doc.metadata['retrieval_method'] = 'entity'
-                        relevant_docs.append(doc)
-                
-                # Then add similarity-based results
-                for doc in similarity_docs:
-                    doc_id = hash(doc.page_content)
-                    if doc_id not in seen_docs and len(relevant_docs) < k_docs:
-                        seen_docs.add(doc_id)
-                        # Add metadata to indicate this was from similarity search
-                        doc.metadata['retrieval_method'] = 'similarity'
-                        relevant_docs.append(doc)
-                
-                print(f"Retrieved {len(relevant_docs)} documents using hybrid entity + similarity search")
-            else:
-                # Fall back to regular similarity search when no entities are present
-                relevant_docs = vectorstore.similarity_search(
-                    processed_question,
-                    k=k_docs
-                )
-                print(f"Retrieved {len(relevant_docs)} documents using similarity search only")
-            
-            if not relevant_docs:
-                response_text = "I couldn't find any relevant information in the documents."
-                conversation_history.append({"role": "user", "content": question})
-                conversation_history.append({"role": "assistant", "content": response_text})
-                return response_text
-            
-            # Combine contexts
-            context = " ".join([doc.page_content for doc in relevant_docs])
-            
-            # Construct messages for the API call with improved formatting instructions
-            messages = [
-                {"role": "system", 
-                 "content": """You are a helpful assistant that answers questions based ONLY on the provided context. 
-                Use information ONLY from the context and remember previous parts of the conversation when answering.
-                """}
-            ]
-            
-            # Add conversation history (limited to last 10 exchanges to manage token limit)
-            if conversation_history:
-                messages.extend(conversation_history[-10:])
-                
-            # Add the current question with context
-            messages.append({"role": "user", "content": f"Context: {context}\n\nQuestion: {question}\n\nAnswer:"})
-
-            memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-            # Use OpenAI API for question answering
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",  # Best option for context adherence
-                messages=messages,
-                max_tokens=800,
-                temperature=0.7
-            )
-            
-            answer = response.choices[0].message.content.strip()
-            
-            # If answer is too short, return relevant context
-            if len(answer) < 3:
-                answer = relevant_docs[0].page_content[:200] + "..."
-            
-            # Apply formatting enhancement
-            formatted_answer = format_response(answer)
-            
-            # Update conversation history with the original answer (not formatted)
-            # to avoid compounding formatting in future responses
-            conversation_history.append({"role": "user", "content": question})
-            conversation_history.append({"role": "assistant", "content": answer})
-                
-            return formatted_answer
-            
-        except Exception as e:
-            print(f"Error in QA pipeline: {e}")
-            error_msg = "Sorry, I encountered an error while processing your question."
-            conversation_history.append({"role": "user", "content": question})
-            conversation_history.append({"role": "assistant", "content": error_msg})
-            return error_msg
+        response = conversational_rag_chain.invoke(
+            {"input": question},
+            config={"configurable": {"session_id": session_id}}
+        )
+        
+        return response["answer"]
 
     return qa_function
-
 
 def test_rag_pipeline(rag_pipeline):
     # Test with conversational queries that build upon each other
@@ -401,7 +348,7 @@ def test_rag_pipeline(rag_pipeline):
         "How fast can these trains go?",
     ]
     
-    print("Testing conversational capabilities:\n")
+    print("Testing conversational capabilities:")
     for question in conversation:
         response = rag_pipeline(question)
         print(f"Q: {question}")

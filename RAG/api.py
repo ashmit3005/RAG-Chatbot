@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from rag_pipeline import load_and_chunk_documents, generate_embeddings, create_vector_store, build_rag_pipeline
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 app = Flask(__name__)
 CORS(app)
@@ -23,19 +24,25 @@ def allowed_file(filename):
 
 # Global variables for the RAG pipeline and conversation history
 global_rag_pipeline = None
-global_conversation_history = []
+
+# With a session store similar to your example
+store = {}
+
+def get_session_history(session_id):
+    if session_id not in store:
+        store[session_id] = ChatMessageHistory()
+    return store[session_id]
 
 def initialize_rag_pipeline(recent_files=None):
-    global global_rag_pipeline, global_conversation_history
+    global global_rag_pipeline
     try:
         chunks = load_and_chunk_documents(recent_files=recent_files)
         embedding_model = generate_embeddings(chunks)
         vectorstore = create_vector_store(chunks, embedding_model)
-        # Pass the existing conversation history to maintain context
-        global_rag_pipeline = build_rag_pipeline(vectorstore, global_conversation_history)
+        global_rag_pipeline = build_rag_pipeline(vectorstore)
     except Exception as e:
         print(f"Error initializing RAG pipeline: {e}")
-        global_rag_pipeline = None
+        global_rag_pipeline = None  
 
 # Initialize the pipeline when starting the server
 initialize_rag_pipeline()
@@ -47,11 +54,12 @@ def chat():
     try:
         # Debug logging
         print("Received request")
-        print("Form data:", request.form)
-        print("Files:", request.files)
         
         # Get the message text (can be empty)
         message = request.form.get('message', '')
+
+        # Get session ID (you could use cookies or other methods)
+        session_id = request.form.get('session_id', 'default')
         
         # Handle file uploads if present
         uploaded_files = []
@@ -86,17 +94,13 @@ def chat():
             print("Initializing RAG pipeline")
             initialize_rag_pipeline()
             
-        if global_rag_pipeline is None:
-            print("Failed to initialize RAG pipeline")
-            return jsonify({"error": "Failed to initialize RAG pipeline"}), 500
-            
         # Process the query (if no message but files uploaded, acknowledge the upload)
         print(f"Processing message: '{message}'")
         if not message and uploaded_files:
             response = f"Successfully uploaded files: {', '.join(uploaded_files)}"
         else:
             try:
-                response = global_rag_pipeline(message) if message else "Files uploaded successfully"
+                response = global_rag_pipeline(message, session_id=session_id) if message else "Files uploaded successfully"
                 print(f"Generated response: '{response[:50]}...'") # Print first 50 chars of response
             except Exception as e:
                 print(f"Error generating response: {e}")
@@ -107,6 +111,7 @@ def chat():
             "response": response,
             "uploaded_files": uploaded_files
         }
+
         print("Sending response")
         return jsonify(response_data)
         
