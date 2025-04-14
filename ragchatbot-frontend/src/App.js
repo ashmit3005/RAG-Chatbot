@@ -6,7 +6,7 @@ import { Switch, TextField } from "@mui/material";
 import PowerIcon from "@mui/icons-material/Power";
 import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUp, faPlus, faSun, faMoon } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUp, faPlus, faSun, faMoon, faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 class App extends Component {
@@ -26,7 +26,8 @@ class App extends Component {
       statusMessage: "", 
       statusType: "",
       isProcessingFiles: false,
-      processedFileNames: [] // Add this to track already processed files
+      processedFileNames: [], // Add this to track already processed files
+      filesDropdownOpen: false // Add state for files dropdown
     };
 
     // Ensure attachedFiles is always initialized
@@ -354,6 +355,12 @@ class App extends Component {
     }));
   };
 
+  toggleFilesDropdown = () => {
+    this.setState(prevState => ({
+      filesDropdownOpen: !prevState.filesDropdownOpen
+    }));
+  };
+
   render() {
     // Destructure with defaults to prevent undefined errors
     const { 
@@ -363,7 +370,8 @@ class App extends Component {
       darkMode = false, 
       statusMessage, 
       statusType,
-      isProcessingFiles
+      isProcessingFiles,
+      filesDropdownOpen
     } = this.state;
     
     // Ensure attachedFiles is always an array
@@ -457,35 +465,53 @@ class App extends Component {
               )}
             </div>
             <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg w-[95%] bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-auto">
-              {/* Show attached files above input if present */}
-              {/* {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-2 py-2 mb-2">
-                  {attachedFiles.map((file, index) => (
-                    <div key={index} className={`flex items-center gap-2 ${
-                      darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                    } rounded-lg px-3 py-2`}>
-                      <div className="w-6 h-6 bg-purple-500 rounded-lg flex items-center justify-center">
-                        <AttachFileIcon className="text-white" fontSize="small" />
-                      </div>
-                      <span className="text-sm truncate max-w-[150px] text-[var(--text-color)]">{file.name}</span>
-                      <button 
-                        onClick={() => {
-                          const newFiles = [...attachedFiles];
-                          newFiles.splice(index, 1);
-                          this.setState({ attachedFiles: newFiles });
-                        }} 
-                        className={`${
-                          darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                        } ml-2`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 111.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+              {/* Files dropdown toggle - always show when files are attached */}
+              {attachedFiles.length > 0 && (
+                <div className="flex items-center justify-between px-2 py-2">
+                  <button 
+                    onClick={this.toggleFilesDropdown} 
+                    className="flex items-center gap-1 text-sm text-[var(--text-color)] hover:opacity-80"
+                  >
+                    <span>Attached files ({attachedFiles.length})</span>
+                    <FontAwesomeIcon icon={filesDropdownOpen ? faChevronUp : faChevronDown} />
+                  </button>
                 </div>
-              )}   */}
+              )}
+
+              {/* Expanded files list - position it above the toggle */}
+              {filesDropdownOpen && attachedFiles.length > 0 && (
+                <div className="absolute bottom-full left-4 right-4 mx-auto bg-[var(--chat-bg)] rounded-t-lg shadow-lg max-h-48 overflow-y-auto z-10">
+                  <div className="flex flex-col gap-2 p-3">
+                    {attachedFiles.map((file, index) => (
+                      <div key={index} className={`flex items-center justify-between ${
+                        darkMode ? 'bg-gray-700' : 'bg-gray-200'
+                      } rounded-lg px-3 py-2 w-full`}>
+                        <div className="flex items-center gap-2 overflow-hidden flex-grow">
+                          <div className="w-6 h-6 flex-shrink-0 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <AttachFileIcon className="text-white" fontSize="small" />
+                          </div>
+                          <span className="text-sm truncate text-[var(--text-color)]">{file.name}</span>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const newFiles = [...attachedFiles];
+                            newFiles.splice(index, 1);
+                            this.setState({ attachedFiles: newFiles });
+                          }} 
+                          className={`${
+                            darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                          } ml-2 flex-shrink-0 p-1 hover:bg-red-500 hover:text-white rounded-full transition-colors`}
+                          title="Remove file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 111.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Status message display */}
               {statusMessage && (
@@ -500,7 +526,7 @@ class App extends Component {
               
               {/* Input area and buttons */}
               <div className="flex items-center gap-2">
-                <div className="flex-grow px-2 w-[90%]" ref={this.textFieldRef}>
+                <div className="flex-grow px-2 w-[100%]" ref={this.textFieldRef}>
                   <TextField
                     multiline
                     minRows={1}
@@ -543,7 +569,7 @@ class App extends Component {
                     }}
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   {/* File Upload Button */}
                   <div className="relative group">
                     <label className={`cursor-pointer flex items-center justify-center w-12 h-12 rounded-full transition ${
@@ -566,7 +592,7 @@ class App extends Component {
                   </div>
 
                   {/* Send Button with Loading Indicator */}
-                  <div className="relative">
+                  <div className="relative flex items-center">
                     <button
                       onClick={this.handleSend}
                       disabled={isProcessingFiles}
@@ -577,10 +603,10 @@ class App extends Component {
                       <FontAwesomeIcon icon={faArrowUp} className="text-[var(--btn-text)]" />
                     </button>
                     
-                    {/* File processing spinner */}
+                    {/* File processing spinner - moved to be aligned with button */}
                     {isProcessingFiles && (
-                      <div className="absolute -top-2 -right-2 w-5 h-5">
-                        <div className="w-full h-full border-2 border-t-transparent border-purple-500 rounded-full animate-spin"></div>
+                      <div className="ml-3">
+                        <div className="w-6 h-6 border-2 border-t-transparent border-purple-500 rounded-full animate-spin"></div>
                       </div>
                     )}
                   </div>

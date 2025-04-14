@@ -10,7 +10,6 @@ from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnableWithMessageHistory
 import os
 import glob
-import openai
 import markdown
 from markdown.extensions.extra import ExtraExtension
 import re
@@ -18,6 +17,7 @@ from nltk import pos_tag, ne_chunk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+from langchain_core.messages import BaseMessage
 
 contextualize_q_system_prompt = """
             Given a chat history and the latest user question which might reference context in the chat history,
@@ -120,11 +120,6 @@ def preprocess_text(text, is_document=False):
     
     # Clean up 
     processed_text = processed_text.strip()
-
-    # Create POS distribution information
-    # pos_counts = {}
-    # for _, tag in pos_tags:
-    #     pos_counts[tag] =  pos_counts.get(tag, 0) + 1
     
     return processed_text, entities
 
@@ -343,6 +338,26 @@ def format_response(text):
     return html
 
 
+class WindowedChatMessageHistory(ChatMessageHistory):
+    """Chat message history that maintains only a window of the most recent messages."""
+    
+    def __init__(self, window_size=10):
+        """Initialize with a window size determining how many messages to keep.
+        
+        Args:
+            window_size (int): Maximum number of messages (human + AI) to retain
+        """
+        super().__init__()
+        self.window_size = window_size
+        
+    def add_message(self, message: BaseMessage) -> None:
+        """Add a message to the history, maintaining the window size."""
+        super().add_message(message)
+        # Trim the history if it exceeds the window size
+        if len(self.messages) > self.window_size:
+            # Remove oldest messages to maintain window size
+            self.messages = self.messages[-self.window_size:]
+
 def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
     # Initialize llm
     llm = ChatOpenAI(
@@ -384,12 +399,13 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
     # Create the retrieval chain
     rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
     
-    # Set up conversation history storage
+    # Set up conversation history storage with a context window
     store = {}
+    CONTEXT_WINDOW_SIZE = 12  # Keep track of 12 messages (6 exchanges)
 
     def get_session_history(session_id):
         if session_id not in store:
-            store[session_id] = ChatMessageHistory()
+            store[session_id] = WindowedChatMessageHistory(window_size=CONTEXT_WINDOW_SIZE)
         return store[session_id]
     
     # Create a stateful conversational chain
