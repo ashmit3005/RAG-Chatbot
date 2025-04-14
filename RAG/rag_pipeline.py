@@ -11,6 +11,8 @@ from langchain_core.runnables import RunnableWithMessageHistory
 import os
 import glob
 import openai
+import markdown
+from markdown.extensions.extra import ExtraExtension
 import re
 from nltk import pos_tag, ne_chunk
 from nltk.corpus import stopwords
@@ -232,36 +234,39 @@ def format_response(text):
     if not text:
         return text
 
-    # Process markdown headings (ensure they don't appear literally in the output)
-    # Replace ### headings with proper HTML heading
-    text = re.sub(r'(?m)^#+\s+(.+?)$', r'<h3>\1</h3>', text)
+    # Convert Markdown to HTML
+    html = markdown.markdown(text, extensions=[ExtraExtension()])
     
-    # Convert sequential asterisks or dashes to proper bullet points
-    text = re.sub(r'(?m)^(\s*[-*]\s+)', r'• ', text)
+    # Clean up issues with paragraph spacing and lists
     
-    # Convert bold markdown to HTML bold
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    # Fix paragraph tags immediately before lists that cause extra spacing
+    html = re.sub(r'<p>(.*?)</p>\s*<(ul|ol)', r'<p>\1</p><\2', html)
     
-    # Convert italic markdown to HTML italic
-    text = re.sub(r'\*([^*]+?)\*', r'<em>\1</em>', text)
+    # Remove empty paragraphs that might add extra spacing
+    html = re.sub(r'<p>\s*</p>', '', html)
     
-    # Convert numbered lists to consistent formatting
-    text = re.sub(r'(?m)^(\s*\d+\.\s+)', r'\1', text)
+    # Fix spacing between list items by removing any extra line breaks or spaces
+    html = re.sub(r'</li>\s*<li>', r'</li><li>', html)
     
-    # Add line breaks between paragraphs if not already present
-    text = re.sub(r'(?<!\n)\n(?!\n)', r'\n\n', text)
+    # Remove paragraph tags inside list items which cause extra spacing
+    html = re.sub(r'<li><p>(.*?)</p></li>', r'<li>\1</li>', html)
     
-    # Handle section titles that might not be marked as headers
-    text = re.sub(r'(?mi)^([A-Z][A-Za-z\s]+:)$', r'<strong>\1</strong>', text)
+    # Remove extra spacing after lists
+    html = re.sub(r'</([uo]l)>\s*<p>', r'</\1><p>', html)
     
-    # Clean up excessive newlines (no more than 2 consecutive ones)
-    text = re.sub(r'\n{3,}', r'\n\n', text)
+    # Fix double paragraph wrapping
+    html = re.sub(r'<p><p>(.*?)</p></p>', r'<p>\1</p>', html)
     
-    # Clean up multiple spaces
-    text = re.sub(r' {2,}', ' ', text)
+    # Remove extra whitespace between paragraphs
+    html = re.sub(r'</p>\s+<p>', r'</p><p>', html)
     
-    # Strip leading/trailing whitespace
-    return text.strip()
+    # Fix excessive line breaks that might appear in the HTML
+    html = re.sub(r'<br\s*/?>\s*<br\s*/?>', r'<br/>', html)
+    
+    # Remove any leading/trailing <br> tags inside paragraphs
+    html = re.sub(r'<p>\s*<br\s*/?>|<br\s*/?>\s*</p>', r'<p>', html)
+    
+    return html
 
 
 def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):

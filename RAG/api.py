@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from rag_pipeline import load_and_chunk_documents, generate_embeddings, create_vector_store, build_rag_pipeline
+from rag_pipeline import load_and_chunk_documents, generate_embeddings, create_vector_store, build_rag_pipeline, format_response
 from langchain_community.chat_message_histories import ChatMessageHistory
 
 app = Flask(__name__)
@@ -101,14 +101,15 @@ def chat():
         else:
             try:
                 response = global_rag_pipeline(message, session_id=session_id) if message else "Files uploaded successfully"
-                print(f"Generated response: '{response[:50]}...'") # Print first 50 chars of response
+                print(f"Generated raw response: '{response}...'") # Print first 50 chars of response
+                print(f"Formatted response: {format_response(response)}") # Print formatted response
             except Exception as e:
                 print(f"Error generating response: {e}")
                 return jsonify({"error": f"Error generating response: {str(e)}"}), 500
         
         # Create the response data
         response_data = {
-            "response": response,
+            "response": format_response(response),
             "uploaded_files": uploaded_files
         }
 

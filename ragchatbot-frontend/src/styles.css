@@ -85,8 +85,6 @@
 
 
 
-
-
 /* Messages */
 .user-msg {
   background-color: var(--btn-bg);
@@ -113,11 +111,34 @@
   font-size: 1.1rem;
   font-weight: 600;
   margin-top: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.2rem;
 }
 
+/* Internal paragraph spacing */
 .bot-message p {
-  margin-bottom: 0.75rem;
+  margin-top: 0;
+  margin-bottom: 0.3rem;
+}
+
+/* Add spacing between consecutive paragraphs */
+.bot-message p + p {
+  margin-top: 0.5rem; /* Increased space between paragraphs */
+}
+
+/* Ensure first paragraph doesn't have top margin */
+.bot-message > p:first-child {
+  margin-top: 0;
+}
+
+/* Ensure last paragraph doesn't have bottom margin */
+.bot-message > p:last-child {
+  margin-bottom: 0;
+}
+
+/* Reduce space before lists */
+.bot-message p:has(+ ul),
+.bot-message p:has(+ ol) {
+  margin-bottom: 0.1rem;
 }
 
 .bot-message strong, 
@@ -130,32 +151,95 @@
   font-style: italic;
 }
 
+/* Improved list formatting with tighter spacing */
 .bot-message ul, 
 .bot-message ol {
+  margin-left: 1.25rem;
+  margin-top: 0.1rem;
+  margin-bottom: 0.1rem;
+  padding-left: 1.5rem;
+  list-style-position: outside;
+}
+
+/* Specially handle ordered lists to prevent number cutoff */
+.bot-message ol {
   margin-left: 1.5rem;
-  margin-bottom: 0.75rem;
+  padding-left: 1.75rem;
 }
 
 .bot-message li {
-  margin-bottom: 0.25rem;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  display: list-item;
 }
 
-/* Style bullet points consistently */
-.bot-message ul li::before {
-  content: "•";
-  display: inline-block;
-  width: 1em;
-  margin-left: -1em;
+/* Force normal list display */
+.bot-message ul {
+  list-style-type: disc;
 }
 
-/* Add space between paragraphs but not after lists */
-.bot-message > *:not(ul):not(ol) + p {
-  margin-top: 0.75rem;
+.bot-message ol {
+  list-style-type: decimal;
 }
 
-/* Ensure consistent spacing for all paragraphs */
+/* Remove all custom bullet styling */
+.bot-message ul li::before,
+.bot-message ol li::before {
+  content: none;
+  display: none;
+}
+
+/* Completely remove any breaks inside list items */
+.bot-message li br {
+  display: none;
+}
+
+/* Make paragraphs inside list items inline with no margins */
+.bot-message li p {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+
+/* Clean spacing between list items */
+.bot-message li + li {
+  margin-top: 0.1rem;
+}
+
+/* Extremely tight spacing between paragraphs and lists */
+.bot-message p + ul,
+.bot-message p + ol {
+  margin-top: 0.1rem;
+}
+
+/* Minimize space after lists */
+.bot-message ul + p,
+.bot-message ol + p {
+  margin-top: 0.2rem;
+}
+
+/* Handle nested lists properly with minimal spacing */
+.bot-message li > ul,
+.bot-message li > ol {
+  margin-top: 0.1rem;
+  margin-bottom: 0;
+  margin-left: 0.25rem;
+  padding-left: 1.25rem;
+}
+
+/* Base text settings for consistent appearance */
 .bot-message {
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+/* Text formatting */
+.bot-message strong {
+  font-weight: bold;
+}
+
+.bot-message em {
+  font-style: italic;
 }
 
 /* Input Area */
