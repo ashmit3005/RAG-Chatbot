@@ -22,10 +22,21 @@ class App extends Component {
       maxFiles: 4,
       isLoading: false,
       bookmarkedMessages: [],
-      reactions: {}
+      reactions: {},
+      statusMessage: "", 
+      statusType: "",
+      isProcessingFiles: false,
+      processedFileNames: [] // Add this to track already processed files
     };
 
+    // Ensure attachedFiles is always initialized
+    if (savedState.attachedFiles === undefined) {
+      savedState.attachedFiles = [];
+    }
+
     this.state = savedState;
+    this.statusTimeoutId = null; // For tracking the status message timeout
+    this.textFieldRef = React.createRef(); // Create a reference for the TextField
   }
 
   // Add componentDidUpdate to save state changes
@@ -41,6 +52,28 @@ class App extends Component {
     };
     localStorage.setItem('chatbotState', JSON.stringify(stateToSave));
   }
+
+  // New method for displaying status messages with auto-clear
+  displayStatusMessage = (message, type = 'success') => {
+    // Clear any existing timeout
+    if (this.statusTimeoutId) {
+      clearTimeout(this.statusTimeoutId);
+    }
+    
+    this.setState({ 
+      statusMessage: message,
+      statusType: type
+    });
+    
+    // Auto-clear after 5 seconds
+    this.statusTimeoutId = setTimeout(() => {
+      this.setState({ 
+        statusMessage: "",
+        statusType: ""
+      });
+      this.statusTimeoutId = null;
+    }, 5000);
+  };
 
   // Add this helper function to generate a title from conversation
   generateConversationTitle = (messages) => {
@@ -105,28 +138,66 @@ class App extends Component {
     });
   };
 
+  // New method to reset the TextField height/spacing
+  resetTextField = () => {
+    if (this.textFieldRef.current) {
+      const textField = this.textFieldRef.current;
+      
+      // Access the input element
+      if (textField.querySelector('textarea')) {
+        const textareaElement = textField.querySelector('textarea');
+        // Reset the height to auto to shrink it back to original size
+        textareaElement.style.height = 'auto';
+      }
+    }
+  };
+
   handleSend = async () => {
-    const { input, attachedFiles } = this.state;
+    // Create safe local copies with defaults
+    const input = this.state.input || "";
+    const attachedFiles = this.state.attachedFiles || [];
+    const processedFileNames = this.state.processedFileNames || [];
     
     // Check if we have either input or files
-    if (!input.trim() && attachedFiles.length === 0) return;
+    if (!input.trim() && (!attachedFiles || attachedFiles.length === 0)) return;
 
     try {
-      // Add message to chat immediately
+      // Add message to chat immediately - always include files in the UI
       const displayMessage = input.trim() || `Uploaded ${attachedFiles.length} file(s)`;
       this.addMessage("user", displayMessage, attachedFiles);
-      this.setState({ input: "", isLoading: true });
+      
+      // Set loading states
+      this.setState({ 
+        input: "", 
+        isLoading: true,
+        attachedFiles: attachedFiles, 
+        isProcessingFiles: false // No need to process files again
+      }, () => {
+        this.resetTextField();
+      });
 
       // Create FormData
       const formData = new FormData();
-      formData.append('message', input.trim());  // Send empty string if no input
+      formData.append('message', input.trim());
       
-      // Append each file with unique field name
-      attachedFiles.forEach((file, index) => {
-        // Debug log
-        console.log(`Attaching file ${index}:`, file.name, file.type);
-        formData.append(`file${index}`, file, file.name);
-      });
+      // Check which files need to be sent and which are already processed
+      if (attachedFiles && attachedFiles.length > 0) {
+        // Filter out files that have already been processed
+        const unprocessedFiles = attachedFiles.filter(file => 
+          !processedFileNames.includes(file.name)
+        );
+        
+        // Only attach files that haven't been processed yet
+        unprocessedFiles.forEach((file, index) => {
+          console.log(`Attaching unprocessed file ${index}:`, file.name, file.type);
+          formData.append(`file${index}`, file, file.name);
+        });
+
+        // If we have already processed files, send their names to inform the backend
+        if (processedFileNames.length > 0) {
+          formData.append('processedFiles', JSON.stringify(processedFileNames));
+        }
+      }
 
       // Log FormData contents for debugging
       for (let pair of formData.entries()) {
@@ -150,12 +221,16 @@ class App extends Component {
       this.addMessage("bot", formattedResponse);
       
       // Clear attached files after successful send
-      this.setState({ attachedFiles: [] });
+      this.setState({ 
+        attachedFiles: [],
+        // Keep track of processed files in case we need them for future reference
+        processedFileNames: [...processedFileNames]
+      });
     } catch (error) {
       console.error("Error sending message:", error);
-      this.addMessage("bot", `Error: ${error.message}`);
+      this.displayStatusMessage(`Error: ${error.message}`, 'error');
     } finally {
-      this.setState({ isLoading: false });
+      this.setState({ isLoading: false, isProcessingFiles: false });
     }
   };
 
@@ -169,22 +244,83 @@ class App extends Component {
     }
   };
 
-  handleFileUpload = (event) => {
+  handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     console.log('Files selected:', files.map(f => f.name));  // Debug log
     
-    if (this.state.attachedFiles.length + files.length > this.state.maxFiles) {
-      alert(`Maximum ${this.state.maxFiles} files allowed`);
+    // Ensure attachedFiles exists before checking length
+    const currentAttachedFiles = this.state.attachedFiles || [];
+    
+    if (currentAttachedFiles.length + files.length > this.state.maxFiles) {
+      this.displayStatusMessage(`Maximum ${this.state.maxFiles} files allowed`, 'error');
       return;
     }
 
+    // First update UI to show selected files and set processing state
     this.setState(prevState => ({
-      attachedFiles: [...prevState.attachedFiles, ...files]
+      attachedFiles: [...(prevState.attachedFiles || []), ...files],
+      isLoading: true, 
+      isProcessingFiles: true // Set file processing indicator
     }));
+
+    try {
+      // Create FormData for immediate upload
+      const formData = new FormData();
+      
+      // Append each file with unique field name
+      files.forEach((file, index) => {
+        console.log(`Attaching file ${index} for immediate upload:`, file.name, file.type);
+        formData.append(`file${index}`, file, file.name);
+      });
+
+      // Use dedicated upload endpoint for better separation of concerns
+      const response = await fetch('http://localhost:5000/api/upload_new_files', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Store the names of successfully processed files
+      if (data.uploaded_files && data.uploaded_files.length > 0) {
+        this.setState(prevState => ({
+          processedFileNames: [...(prevState.processedFileNames || []), ...data.uploaded_files]
+        }));
+      }
+      
+      // Display status message instead of adding a chat message
+      const uploadMessage = data.message || `Files uploaded successfully: ${files.map(f => f.name).join(', ')}`;
+      this.displayStatusMessage(uploadMessage, 'success');
+      
+      console.log("Files uploaded successfully:", data.uploaded_files);
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      // Display error message as status
+      this.displayStatusMessage(`Error uploading files: ${error.message}`, 'error');
+      
+      // Remove the failed files from state
+      this.setState(prevState => ({
+        attachedFiles: prevState.attachedFiles.filter(f => !files.includes(f))
+      }));
+    } finally {
+      // Clear loading states after processing completes
+      this.setState({ isLoading: false, isProcessingFiles: false });
+    }
   };
 
   startNewConversation = () => {
-    this.setState({ activeConversation: null, input: "", attachedFiles: [] });
+    // Reset processed files when starting a new conversation
+    this.setState({ 
+      activeConversation: null, 
+      input: "", 
+      attachedFiles: [],
+      processedFileNames: [] 
+    });
   };
 
   switchConversation = (index) => {
@@ -219,7 +355,20 @@ class App extends Component {
   };
 
   render() {
-    const { conversations = [], activeConversation, input = "", darkMode = false, attachedFiles = [] } = this.state;
+    // Destructure with defaults to prevent undefined errors
+    const { 
+      conversations = [], 
+      activeConversation, 
+      input = "", 
+      darkMode = false, 
+      statusMessage, 
+      statusType,
+      isProcessingFiles
+    } = this.state;
+    
+    // Ensure attachedFiles is always an array
+    const attachedFiles = this.state.attachedFiles || [];
+    
     const currentMessages = activeConversation !== null && conversations[activeConversation] 
       ? conversations[activeConversation].messages 
       : [];
@@ -309,7 +458,7 @@ class App extends Component {
             </div>
             <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg w-[95%] bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-auto">
               {/* Show attached files above input if present */}
-              {attachedFiles.length > 0 && (
+              {/* {attachedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-2 py-2 mb-2">
                   {attachedFiles.map((file, index) => (
                     <div key={index} className={`flex items-center gap-2 ${
@@ -330,16 +479,28 @@ class App extends Component {
                         } ml-2`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 111.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
                       </button>
                     </div>
                   ))}
                 </div>
+              )}   */}
+              
+              {/* Status message display */}
+              {statusMessage && (
+                <div className={`px-3 py-2 mb-2 rounded-lg text-sm ${
+                  statusType === 'error' 
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200' 
+                    : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'
+                } transition-all duration-300`}>
+                  {statusMessage}
+                </div>
               )}
+              
               {/* Input area and buttons */}
               <div className="flex items-center gap-2">
-                <div className="flex-grow px-2 w-[90%]">
+                <div className="flex-grow px-2 w-[90%]" ref={this.textFieldRef}>
                   <TextField
                     multiline
                     minRows={1}
@@ -367,7 +528,7 @@ class App extends Component {
                     sx={{
                       width: '100%',
                       '& .MuiInputBase-root': {
-                        padding: '8px 12px',
+                        padding: '4px 12px',
                         alignItems: 'center',
                         width: '100%',
                       },
@@ -386,7 +547,7 @@ class App extends Component {
                   {/* File Upload Button */}
                   <div className="relative group">
                     <label className={`cursor-pointer flex items-center justify-center w-12 h-12 rounded-full transition ${
-                      attachedFiles.length >= this.state.maxFiles ? 'bg-gray-400' : 'bg-[var(--btn-bg)]'
+                      attachedFiles.length >= this.state.maxFiles || isProcessingFiles ? 'bg-gray-400' : 'bg-[var(--btn-bg)]'
                     } hover:opacity-80`}>
                       <input 
                         type="file" 
@@ -394,22 +555,35 @@ class App extends Component {
                         className="hidden" 
                         accept=".pdf,.doc,.docx,.txt"
                         multiple
-                        disabled={attachedFiles.length >= this.state.maxFiles}
+                        disabled={attachedFiles.length >= this.state.maxFiles || isProcessingFiles}
                       />
                       <FontAwesomeIcon icon={faPlus} className="text-[var(--btn-text)] text-xl" />
                     </label>
                     <span className="absolute -top-14 left-1/2 transform -translate-x-1/2 scale-0 group-hover:scale-100 transition bg-[var(--chat-bg)] text-[var(--text-color)] text-sm font-semibold px-2 py-1 rounded-md shadow-md border border-[var(--text-color)]">
-                      {attachedFiles.length >= this.state.maxFiles ? 'Max files reached' : 'Attach File'}
+                      {isProcessingFiles ? 'Processing files...' : 
+                        attachedFiles.length >= this.state.maxFiles ? 'Max files reached' : 'Attach File'}
                     </span>
                   </div>
 
-                  {/* Send Button */}
-                  <button
-                    onClick={this.handleSend}
-                    className="flex items-center justify-center w-12 h-12 rounded-full transition bg-[var(--btn-bg)] hover:opacity-80"
-                  >
-                    <FontAwesomeIcon icon={faArrowUp} className="text-[var(--btn-text)]" />
-                  </button>
+                  {/* Send Button with Loading Indicator */}
+                  <div className="relative">
+                    <button
+                      onClick={this.handleSend}
+                      disabled={isProcessingFiles}
+                      className={`flex items-center justify-center w-12 h-12 rounded-full transition ${
+                        isProcessingFiles ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-80'
+                      } bg-[var(--btn-bg)]`}
+                    >
+                      <FontAwesomeIcon icon={faArrowUp} className="text-[var(--btn-text)]" />
+                    </button>
+                    
+                    {/* File processing spinner */}
+                    {isProcessingFiles && (
+                      <div className="absolute -top-2 -right-2 w-5 h-5">
+                        <div className="w-full h-full border-2 border-t-transparent border-purple-500 rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

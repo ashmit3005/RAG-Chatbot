@@ -214,6 +214,80 @@ def load_and_chunk_documents(recent_files=None):
     print(f"Created {len(chunks)} chunks from {len(database_files) + len(uploaded_files)} documents")
     return chunks
 
+def load_single_document(file_path):
+    """
+    Load and process a single document file.
+    
+    Args:
+        file_path (str): The path to the document file
+        
+    Returns:
+        list: Document chunks after processing
+    """
+    try:
+        loader = PyPDFLoader(file_path)
+        docs = loader.load()
+        filename = os.path.basename(file_path)
+
+        # Add metadata for uploaded document
+        for doc in docs:
+            doc.metadata['source'] = 'uploaded'
+            doc.metadata['is_recent'] = True
+
+            # Apply preprocessing to document content
+            doc.page_content, entities = preprocess_text(doc.page_content, True)
+
+            # Store entities in metadata for later use
+            doc.metadata['entities'] = entities
+
+            # Create an entity summary
+            entity_summary = []
+            for entity_type, entity_list in entities.items():
+                if entity_list:
+                    entity_summary.append(f"{entity_type}: {', '.join(entity_list)}")
+            
+            if entity_summary:
+                doc.metadata['entity_summary'] = "; ".join(entity_summary)
+
+        print(f"Loaded new file: {file_path}")
+        
+        # Split into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
+        )
+        chunks = text_splitter.split_documents(docs)
+        print(f"Created {len(chunks)} chunks from new document")
+        return chunks
+        
+    except Exception as e:
+        print(f"Error loading file {file_path}: {e}")
+        return []
+
+def update_vector_store(vectorstore, new_chunks, embedding_model):
+    """
+    Update an existing vector store with new document chunks.
+    
+    Args:
+        vectorstore: The existing FAISS vectorstore
+        new_chunks: List of new document chunks to add
+        embedding_model: The embedding model to use
+        
+    Returns:
+        Updated vectorstore
+    """
+    if not new_chunks:
+        return vectorstore
+        
+    try:
+        # Add the new chunks to the existing vectorstore
+        vectorstore.add_documents(new_chunks)
+        print(f"Added {len(new_chunks)} new chunks to the vector store")
+        return vectorstore
+    except Exception as e:
+        print(f"Error updating vector store: {e}")
+        return vectorstore
 
 def generate_embeddings(chunks):
     embedding_model = OpenAIEmbeddings(
