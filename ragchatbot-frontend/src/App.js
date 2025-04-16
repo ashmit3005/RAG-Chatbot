@@ -394,7 +394,7 @@ class App extends Component {
             Clear History
           </button>
         </div>
-        <div className={`chat-layout ${this.state.isOpen ? "sidebar-expanded" : ""}`} >
+        <div className={`chat-layout ${this.state.isOpen ? "sidebar-expanded" : ""}`}>
           <ChatHistory 
             conversations={conversations} 
             switchConversation={this.switchConversation} 
@@ -402,7 +402,7 @@ class App extends Component {
             selectedConversation={activeConversation} 
             toggleSidebar={(isOpen) => this.setState({ isOpen })} 
           />
-          <motion.div className={"chat-container"}>
+          <motion.div className={`chat-container ${!this.state.isOpen ? "expanded" : ""}`}>
             <div className="chat-header flex items-center gap-2 p-4">
               <PowerIcon className="text-[var(--text-color)]" fontSize="large" />
               <h1 className="text-4xl font-bold text-[var(--text-color)]">PowerWise - A Power Quality ChatBot</h1>
@@ -464,7 +464,7 @@ class App extends Component {
                 </motion.div>
               )}
             </div>
-            <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg w-[95%] bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-auto">
+            <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg bg-[var(--chat-bg)] text-[var(--text-color)] mb-8">
               {/* Files dropdown toggle - always show when files are attached */}
               {attachedFiles.length > 0 && (
                 <div className="flex items-center justify-between px-2 py-2">
@@ -614,7 +614,9 @@ class App extends Component {
               </div>
             </div>
           </motion.div>
-          <FAQSection />
+          <div className="faq-section-wrapper">
+            <FAQSection />
+          </div>
         </div>
       </div>
     );

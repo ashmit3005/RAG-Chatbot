@@ -29,11 +29,13 @@
   color: var(--text-color);
 }
 
-.chat-header{
+/* Header positioning fix */
+.chat-header {
   align-items: center;
   justify-content: center;
-  margin-left: 10rem;
+  margin-left: 0;
 }
+
 /* Header */
 .app-header {
   text-align: center;
@@ -46,6 +48,7 @@
   display: flex;
   width: 100%;
   height: calc(100vh - 80px);
+  position: relative;
 }
 
 /* Sidebar */
@@ -67,9 +70,17 @@
 .chat-container {
   flex-grow: 1;
   display: flex;
-  margin-left: 10rem;
   flex-direction: column;
   padding: 10px;
+  transition: all 0.3s ease;
+  margin-left: 72px; /* Fixed margin based on collapsed sidebar width */
+  width: calc(100% - 20rem - 72px); /* Fixed width that won't change with sidebar state */
+}
+
+.chat-container.expanded {
+  /* Keep the same margin and width to prevent layout shift */
+  margin-left: 72px;
+  width: calc(100% - 20rem - 72px);
 }
 
 .chat-window {
@@ -77,13 +88,10 @@
   overflow-y: auto;
   padding: 15px;
   margin-bottom: 1rem;
-  margin-left: 10rem;
   margin-top: 1rem;
   background: var(--chat-bg);
   border-radius: 10px;
 }
-
-
 
 /* Messages */
 .user-msg {
@@ -244,18 +252,25 @@
 
 /* Input Area */
 .input-area {
+  width: calc(100% - 20px);
   display: flex;
   align-items: center;
   padding: 10px;
-  margin-left: 10.2rem;
-  width: 90%;
-  margin-bottom: -3rem;
   gap: 10px;
+  margin: 0 10px 0 10px;
+  max-width: none;
 }
 
 .chat-input {
   flex-grow: 1;
   font-size: 16px;
+}
+
+/* FAQ Section positioning */
+.faq-section-wrapper {
+  width: 20rem;
+  position: relative;
+  margin-top: -2rem; /* Move FAQ section up */
 }
 
 .faq-section {
@@ -315,7 +330,6 @@
   border-radius: 6px;
   font-size: 1rem;
 }
-
 
 .send-button {
   padding: 10px;
