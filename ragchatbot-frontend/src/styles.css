@@ -93,6 +93,15 @@
   border-radius: 10px;
 }
 
+/* Ensure chat window and input area have the same width constraints */
+.chat-window, 
+.input-area {
+  width: calc(100% - 20px);
+  box-sizing: border-box;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
 /* Messages */
 .user-msg {
   background-color: var(--btn-bg);
@@ -257,13 +266,15 @@
   align-items: center;
   padding: 10px;
   gap: 10px;
-  margin: 0 10px 0 10px;
+  margin: 0 10px 10px 10px;
   max-width: none;
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
-.chat-input {
-  flex-grow: 1;
-  font-size: 16px;
+/* Make sure text field resets cleanly */
+.MuiInputBase-root textarea {
+  transition: height 0.1s ease;
+  resize: none;
 }
 
 /* FAQ Section positioning */

@@ -147,8 +147,15 @@ class App extends Component {
       // Access the input element
       if (textField.querySelector('textarea')) {
         const textareaElement = textField.querySelector('textarea');
-        // Reset the height to auto to shrink it back to original size
-        textareaElement.style.height = 'auto';
+        
+        // Force complete reset by clearing/setting various properties
+        textareaElement.value = '';
+        
+        // Clear any selection and ensure cursor is at the beginning
+        textareaElement.setSelectionRange(0, 0);
+        
+        // Remove any content, including hidden newlines
+        textareaElement.innerHTML = '';
       }
     }
   };
@@ -167,27 +174,39 @@ class App extends Component {
       const displayMessage = input.trim() || `Uploaded ${attachedFiles.length} file(s)`;
       this.addMessage("user", displayMessage, attachedFiles);
       
-      // Set loading states
+      // First reset the input value in state
       this.setState({ 
-        input: "", 
-        isLoading: true,
+        input: "", // Clear input completely
+        isLoading: true, 
         attachedFiles: attachedFiles, 
         isProcessingFiles: false // No need to process files again
       }, () => {
+        // Completely reset the text field after the state has been updated
         this.resetTextField();
+        
+        // Additional reset for MUI TextField to ensure no newlines remain
+        const textField = this.textFieldRef.current;
+        if (textField) {
+          const textareaElement = textField.querySelector('textarea');
+          if (textareaElement) {
+            // Force clear any remaining content or state
+            textareaElement.value = '';
+            textareaElement.defaultValue = '';
+          }
+        }
       });
 
       // Create FormData
       const formData = new FormData();
       formData.append('message', input.trim());
-      
+
       // Check which files need to be sent and which are already processed
       if (attachedFiles && attachedFiles.length > 0) {
         // Filter out files that have already been processed
         const unprocessedFiles = attachedFiles.filter(file => 
           !processedFileNames.includes(file.name)
         );
-        
+
         // Only attach files that haven't been processed yet
         unprocessedFiles.forEach((file, index) => {
           console.log(`Attaching unprocessed file ${index}:`, file.name, file.type);
@@ -216,11 +235,11 @@ class App extends Component {
       }
 
       const data = await response.json();
-      
+
       // Process the response text to convert newlines to <br> elements
       const formattedResponse = data.response.replace(/\n/g, '<br>').replace(/•/g, '&bull;');
       this.addMessage("bot", formattedResponse);
-      
+
       // Clear attached files after successful send
       this.setState({ 
         attachedFiles: [],
@@ -240,7 +259,8 @@ class App extends Component {
   };
 
   handleKeyPress = (event) => {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault(); // Prevent default to avoid adding a newline
       this.handleSend();
     }
   };
@@ -248,10 +268,10 @@ class App extends Component {
   handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     console.log('Files selected:', files.map(f => f.name));  // Debug log
-    
+
     // Ensure attachedFiles exists before checking length
     const currentAttachedFiles = this.state.attachedFiles || [];
-    
+
     if (currentAttachedFiles.length + files.length > this.state.maxFiles) {
       this.displayStatusMessage(`Maximum ${this.state.maxFiles} files allowed`, 'error');
       return;
@@ -267,7 +287,7 @@ class App extends Component {
     try {
       // Create FormData for immediate upload
       const formData = new FormData();
-      
+
       // Append each file with unique field name
       files.forEach((file, index) => {
         console.log(`Attaching file ${index} for immediate upload:`, file.name, file.type);
@@ -286,18 +306,17 @@ class App extends Component {
       }
 
       const data = await response.json();
-      
+
       // Store the names of successfully processed files
       if (data.uploaded_files && data.uploaded_files.length > 0) {
         this.setState(prevState => ({
           processedFileNames: [...(prevState.processedFileNames || []), ...data.uploaded_files]
         }));
       }
-      
+
       // Display status message instead of adding a chat message
       const uploadMessage = data.message || `Files uploaded successfully: ${files.map(f => f.name).join(', ')}`;
       this.displayStatusMessage(uploadMessage, 'success');
-      
       console.log("Files uploaded successfully:", data.uploaded_files);
     } catch (error) {
       console.error("Error uploading files:", error);
@@ -373,10 +392,10 @@ class App extends Component {
       isProcessingFiles,
       filesDropdownOpen
     } = this.state;
-    
+
     // Ensure attachedFiles is always an array
     const attachedFiles = this.state.attachedFiles || [];
-    
+
     const currentMessages = activeConversation !== null && conversations[activeConversation] 
       ? conversations[activeConversation].messages 
       : [];
@@ -464,7 +483,7 @@ class App extends Component {
                 </motion.div>
               )}
             </div>
-            <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg bg-[var(--chat-bg)] text-[var(--text-color)] mb-8">
+            <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-10">
               {/* Files dropdown toggle - always show when files are attached */}
               {attachedFiles.length > 0 && (
                 <div className="flex items-center justify-between px-2 py-2">
@@ -477,7 +496,6 @@ class App extends Component {
                   </button>
                 </div>
               )}
-
               {/* Expanded files list - position it above the toggle */}
               {filesDropdownOpen && attachedFiles.length > 0 && (
                 <div className="absolute bottom-full left-4 right-4 mx-auto bg-[var(--chat-bg)] rounded-t-lg shadow-lg max-h-48 overflow-y-auto z-10">
@@ -512,7 +530,6 @@ class App extends Component {
                   </div>
                 </div>
               )}
-              
               {/* Status message display */}
               {statusMessage && (
                 <div className={`px-3 py-2 mb-2 rounded-lg text-sm ${
@@ -523,11 +540,10 @@ class App extends Component {
                   {statusMessage}
                 </div>
               )}
-              
               {/* Input area and buttons */}
               <div className="flex items-center gap-2">
                 <div className="flex-grow px-2 w-[100%]" ref={this.textFieldRef}>
-                  <TextField
+                  <TextField 
                     multiline
                     minRows={1}
                     maxRows={5}
@@ -590,7 +606,6 @@ class App extends Component {
                         attachedFiles.length >= this.state.maxFiles ? 'Max files reached' : 'Attach File'}
                     </span>
                   </div>
-
                   {/* Send Button with Loading Indicator */}
                   <div className="relative flex items-center">
                     <button
@@ -602,7 +617,6 @@ class App extends Component {
                     >
                       <FontAwesomeIcon icon={faArrowUp} className="text-[var(--btn-text)]" />
                     </button>
-                    
                     {/* File processing spinner - moved to be aligned with button */}
                     {isProcessingFiles && (
                       <div className="ml-3">
@@ -611,7 +625,7 @@ class App extends Component {
                     )}
                   </div>
                 </div>
-              </div>
+              </div>  
             </div>
           </motion.div>
           <div className="faq-section-wrapper">
