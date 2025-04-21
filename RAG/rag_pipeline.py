@@ -39,56 +39,35 @@ def get_wordnet_pos(tag):
 
 def preprocess_text(text, is_document=False):
     """
-    Enhanced text preprocessing using NLTK for improved quality in embedding and retrieval.
+    Enhanced text preprocessing using NLTK.
 
     Args:
         text (str): The text to preprocess
-        is_document (bool): Whether this is a document (True) or query (False)
+        is_document (bool): Apply more extensive cleaning for documents
         
     Returns:
         tuple: (processed_text, entities_dict)
     """
     if not text or not isinstance(text, str):
-        return text
+        return text, {}
     
-    # Convert to lowercase
-    text = text.lower()
-
-    # Basic normalization
-    text = text.strip()
+    text = text.lower().strip()
+    text = re.sub(r'\s+', ' ', text) # Remove extra whitespace
+    text = re.sub(r'http[s]?://\S+', '', text) # Remove URLs
+    text = re.sub(r'\S+@\S+', '', text) # Remove email addresses
+    text = re.sub(r'[^\w\s.,?!;:()\-\'"]', ' ', text) # Remove special chars
+    text = re.sub(r'<[^>]+>', ' ', text) # Remove HTML
     
-    # Remove extra whitespace
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Remove URLs
-    text = re.sub(r'http[s]?://\S+', '', text)
-    
-    # Remove email addresses
-    text = re.sub(r'\S+@\S+', '', text)
-    
-    # Remove special characters but keep periods, question marks, etc.
-    text = re.sub(r'[^\w\s.,?!;:()\-\'"]', ' ', text)
-
-    # Remove HTML code
-    text = re.sub(r'<[^>]+>', ' ', text)
-    
-    # Tokenize the text
     tokens = word_tokenize(text)
-
-    # Tag parts of speech
     pos_tags = pos_tag(tokens)
-
-    # Named entity recognition (NER) 
     ne_chunked = ne_chunk(pos_tags)
 
-    # Extract entities by type
+    # Extract entities
     entities = {
         'PERSON': [], 'ORGANIZATION': [], 'LOCATION': [], 
         'DATE': [], 'TIME': [], 'MONEY': [], 'PERCENT': [], 
         'FACILITY': [], 'GPE': []
     }
-
-    # Process the named entities tree
     for chunk in ne_chunked:
         if hasattr(chunk, 'label'):
             entity_type = chunk.label()
@@ -96,29 +75,19 @@ def preprocess_text(text, is_document=False):
             if entity_type in entities:
                 entities[entity_type].append(entity_text)
 
-    # Perform more extensive preprocessing for documents
+    # More extensive preprocessing for documents
     if is_document:
-        # Get stopwords
         stop_words = set(stopwords.words('english'))
-        
-        # Filter out stopwords and lemmatize tokens - but keep relevant ones for context
         filtered_tokens = [(word, tag) for word, tag in pos_tags if word.lower() not in stop_words]
-
-        # Initialize lemmatizer 
         lemmatizer = WordNetLemmatizer()
         processed_tokens = [lemmatizer.lemmatize(word, get_wordnet_pos(tag)) for word, tag in filtered_tokens]
-
-        processed_text =  ' '.join(processed_tokens)
+        processed_text = ' '.join(processed_tokens)
     else:
         processed_text = text
     
-    # Remove extra punctuation 
+    # Clean up punctuation and spacing
     processed_text = re.sub(r'([.,!?;:])\1+', r'\1', processed_text)
-    
-    # Fix spacing around punctuation
     processed_text = re.sub(r'\s([.,!?;:])', r'\1', processed_text)
-    
-    # Clean up 
     processed_text = processed_text.strip()
     
     return processed_text, entities
@@ -137,31 +106,17 @@ def load_and_chunk_documents(recent_files=None):
         try:
             loader = PyPDFLoader(file_path)
             docs = loader.load()
-
-            # Add metadata for database documents
             for doc in docs:
                 doc.metadata['source'] = 'database'
                 doc.metadata['is_recent'] = False
-
-                # Apply preprocessing to document content
                 doc.page_content, entities = preprocess_text(doc.page_content, True)
-
-                # Store entities in metaadata for later use
                 doc.metadata['entities'] = entities
-
-                # Create an entity summary
-                entity_summary = []
-                for entity_type, entity_list in entities.items():
-                    if entity_list:
-                        entity_summary.append(f"{entity_type}: {', '.join(entity_list)}")
-                
-                if entity_summary:
-                    doc.metadata['entity_summary'] = "; ".join(entity_summary)
-
+                # Optionally create entity summary if needed later
+                # entity_summary = [f"{etype}: {', '.join(elist)}" for etype, elist in entities.items() if elist]
+                # if entity_summary: doc.metadata['entity_summary'] = "; ".join(entity_summary)
             documents.extend(docs)
-            print(f"Loaded database file: {file_path}")
         except Exception as e:
-            print(f"Error loading database file {file_path}: {e}")
+            print(f"Warning: Error loading database file {os.path.basename(file_path)}: {e}")
 
     # Load from Uploaded Documents
     uploaded_files = glob.glob(os.path.join(uploaded_dir, '*.pdf'))
@@ -170,34 +125,19 @@ def load_and_chunk_documents(recent_files=None):
             loader = PyPDFLoader(file_path)
             docs = loader.load()
             filename = os.path.basename(file_path)
-
-            # Add metadata for uploaded documents
             for doc in docs:
                 doc.metadata['source'] = 'uploaded'
                 doc.metadata['is_recent'] = recent_files and filename in recent_files
-
-                # Apply preprocessing to document content
                 doc.page_content, entities = preprocess_text(doc.page_content, True)
-
-                # Store entities in metaadata for later use
                 doc.metadata['entities'] = entities
-
-                # Create an entity summary
-                entity_summary = []
-                for entity_type, entity_list in entities.items():
-                    if entity_list:
-                        entity_summary.append(f"{entity_type}: {', '.join(entity_list)}")
-                
-                if entity_summary:
-                    doc.metadata['entity_summary'] = "; ".join(entity_summary)
-
+                # Optionally create entity summary
             documents.extend(docs)
-            print(f"Loaded uploaded file: {file_path} {'(recent)' if doc.metadata['is_recent'] else ''}")
         except Exception as e:
-            print(f"Error loading uploaded file {file_path}: {e}")
+            print(f"Warning: Error loading uploaded file {os.path.basename(file_path)}: {e}")
     
     if not documents:
-        raise RuntimeError("No documents loaded from either directory.")
+        print("Warning: No documents loaded.")
+        return [] # Return empty list if no documents found
 
     # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(
@@ -206,172 +146,118 @@ def load_and_chunk_documents(recent_files=None):
         separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Created {len(chunks)} chunks from {len(database_files) + len(uploaded_files)} documents")
+    print(f"Created {len(chunks)} chunks from {len(database_files) + len(uploaded_files)} documents.")
     return chunks
 
 def load_single_document(file_path):
-    """
-    Load and process a single document file.
-    
-    Args:
-        file_path (str): The path to the document file
-        
-    Returns:
-        list: Document chunks after processing
-    """
+    """Load and process a single document file."""
     try:
         loader = PyPDFLoader(file_path)
         docs = loader.load()
         filename = os.path.basename(file_path)
-
-        # Add metadata for uploaded document
         for doc in docs:
             doc.metadata['source'] = 'uploaded'
             doc.metadata['is_recent'] = True
-
-            # Apply preprocessing to document content
             doc.page_content, entities = preprocess_text(doc.page_content, True)
-
-            # Store entities in metadata for later use
             doc.metadata['entities'] = entities
+            # Optionally create entity summary
 
-            # Create an entity summary
-            entity_summary = []
-            for entity_type, entity_list in entities.items():
-                if entity_list:
-                    entity_summary.append(f"{entity_type}: {', '.join(entity_list)}")
-            
-            if entity_summary:
-                doc.metadata['entity_summary'] = "; ".join(entity_summary)
-
-        print(f"Loaded new file: {file_path}")
-        
-        # Split into chunks
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
             separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
         )
         chunks = text_splitter.split_documents(docs)
-        print(f"Created {len(chunks)} chunks from new document")
+        print(f"Created {len(chunks)} chunks from new document: {filename}")
         return chunks
         
     except Exception as e:
-        print(f"Error loading file {file_path}: {e}")
+        print(f"Error loading single file {os.path.basename(file_path)}: {e}")
         return []
 
 def update_vector_store(vectorstore, new_chunks, embedding_model):
-    """
-    Update an existing vector store with new document chunks.
-    
-    Args:
-        vectorstore: The existing FAISS vectorstore
-        new_chunks: List of new document chunks to add
-        embedding_model: The embedding model to use
-        
-    Returns:
-        Updated vectorstore
-    """
+    """Update an existing vector store with new document chunks."""
     if not new_chunks:
         return vectorstore
-        
     try:
-        # Add the new chunks to the existing vectorstore
         vectorstore.add_documents(new_chunks)
-        print(f"Added {len(new_chunks)} new chunks to the vector store")
+        print(f"Added {len(new_chunks)} new chunks to the vector store.")
         return vectorstore
     except Exception as e:
         print(f"Error updating vector store: {e}")
         return vectorstore
 
 def generate_embeddings(chunks):
-    embedding_model = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Using OpenAI's most powerful embedding model
-    )
+    # Using OpenAI's recommended embedding model
+    embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
     return embedding_model
 
-
 def create_vector_store(chunks, embedding_model):
+    if not chunks:
+        print("Warning: No chunks provided to create vector store.")
+        # Depending on requirements, might return None or raise error
+        # For now, let's return None and handle it upstream
+        return None 
     vectorstore = FAISS.from_documents(documents=chunks, embedding=embedding_model)
     return vectorstore
 
 def format_response(text):
-    """
-    Improve the formatting of the response text for better readability
-    and ensure proper handling of Markdown formatting
-    """
+    """Convert Markdown to HTML and clean up formatting issues."""
     if not text:
         return text
 
-    # Convert Markdown to HTML
+    # Convert Markdown to HTML using 'extra' extension for features like tables, fenced code blocks
     html = markdown.markdown(text, extensions=[ExtraExtension()])
     
-    # Clean up issues with paragraph spacing and lists
+    # Clean up common formatting issues from Markdown conversion
+    html = re.sub(r'<p>(.*?)</p>\s*<(ul|ol)', r'<p>\1</p><\2', html) # Fix paragraph before list spacing
+    html = re.sub(r'<p>\s*</p>', '', html) # Remove empty paragraphs
+    html = re.sub(r'</li>\s*<li>', r'</li><li>', html) # Fix list item spacing
+    html = re.sub(r'<li><p>(.*?)</p></li>', r'<li>\1</li>', html) # Remove paragraph tags inside list items
+    html = re.sub(r'</([uo]l)>\s*<p>', r'</\1><p>', html) # Fix spacing after lists
+    html = re.sub(r'<p><p>(.*?)</p></p>', r'<p>\1</p>', html) # Fix double paragraph wrapping
+    html = re.sub(r'</p>\s+<p>', r'</p><p>', html) # Remove extra whitespace between paragraphs
+    html = re.sub(r'(<br\s*/?>\s*){2,}', r'<br/>', html) # Consolidate multiple breaks
+    html = re.sub(r'<p>\s*<br\s*/?>', r'<p>', html) # Remove leading breaks in paragraphs
+    html = re.sub(r'<br\s*/?>\s*</p>', r'</p>', html) # Remove trailing breaks in paragraphs
     
-    # Fix paragraph tags immediately before lists that cause extra spacing
-    html = re.sub(r'<p>(.*?)</p>\s*<(ul|ol)', r'<p>\1</p><\2', html)
-    
-    # Remove empty paragraphs that might add extra spacing
-    html = re.sub(r'<p>\s*</p>', '', html)
-    
-    # Fix spacing between list items by removing any extra line breaks or spaces
-    html = re.sub(r'</li>\s*<li>', r'</li><li>', html)
-    
-    # Remove paragraph tags inside list items which cause extra spacing
-    html = re.sub(r'<li><p>(.*?)</p></li>', r'<li>\1</li>', html)
-    
-    # Remove extra spacing after lists
-    html = re.sub(r'</([uo]l)>\s*<p>', r'</\1><p>', html)
-    
-    # Fix double paragraph wrapping
-    html = re.sub(r'<p><p>(.*?)</p></p>', r'<p>\1</p>', html)
-    
-    # Remove extra whitespace between paragraphs
-    html = re.sub(r'</p>\s+<p>', r'</p><p>', html)
-    
-    # Fix excessive line breaks that might appear in the HTML
-    html = re.sub(r'<br\s*/?>\s*<br\s*/?>', r'<br/>', html)
-    
-    # Remove any leading/trailing <br> tags inside paragraphs
-    html = re.sub(r'<p>\s*<br\s*/?>|<br\s*/?>\s*</p>', r'<p>', html)
-    
-    return html
+    return html.strip()
 
 
 class WindowedChatMessageHistory(ChatMessageHistory):
     """Chat message history that maintains only a window of the most recent messages."""
     
     def __init__(self, window_size=10):
-        """Initialize with a window size determining how many messages to keep.
-        
+        """Initialize with a window size.
         Args:
-            window_size (int): Maximum number of messages (human + AI) to retain
+            window_size (int): Maximum number of messages (human + AI) to retain.
         """
         super().__init__()
-        self._window_size = window_size  # Use a protected attribute name
+        self._window_size = window_size 
         
     @property
     def window_size(self):
-        """Property to safely access the window size."""
         return self._window_size
         
     @window_size.setter
     def window_size(self, value):
-        """Property setter for window size."""
         self._window_size = value
         
     def add_message(self, message: BaseMessage) -> None:
-        """Add a message to the history, maintaining the window size."""
+        """Add a message, trimming history if it exceeds the window size."""
         super().add_message(message)
-        # Trim the history if it exceeds the window size
-        if len(self.messages) > self._window_size:  # Use the protected attribute
-            # Remove oldest messages to maintain window size
+        if len(self.messages) > self._window_size:
             self.messages = self.messages[-self._window_size:]
 
-def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
-    # Initialize llm
+def build_rag_pipeline(vectorstore, llm_model_name="gpt-4o-mini", history_window_size=12):
+    """Builds the complete RAG pipeline with history."""
+    
+    if vectorstore is None:
+        print("Error: Cannot build RAG pipeline without a valid vectorstore.")
+        return None # Cannot proceed without a vectorstore
+
     llm = ChatOpenAI(
-        model=llm, 
+        model=llm_model_name, 
         temperature=0.3,
         max_tokens=750
     )
@@ -382,23 +268,15 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
         ("human", "{input}"),
     ])
 
-    # Create a retriever with history awareness
     history_aware_retriever = create_history_aware_retriever(
         llm, 
         vectorstore.as_retriever(),
         contextualize_q_prompt,
     )
 
-    # Create the question-answering chain
-    qa_system_prompt = """You are a helpful assistant that provides information based ONLY on the documents in your knowledge base.
-    Use ONLY the following pieces of retrieved context to answer the question and only include outside information if it is explicitly mentioned in the context
-    and relevant to the question and document content.
-    If you don't know the answer or if the context doesn't contain relevant information, say you don't have enough information to answer.
-    Remain conversational and engaging in your responses while keeping the answers concise and relevant.
-
-    IMPORTANT CONSTRAINTS:       
-    1. Focus on direct answers rather than lengthy explanations.
-    2. If you don't know the answer or if the context doesn't contain relevant information, say you don't have enough information to answer.
+    qa_system_prompt = """You are a helpful assistant providing information based ONLY on the retrieved context.
+    Use ONLY the provided context to answer. If the context doesn't contain the answer, state that you don't have enough information.
+    Keep answers concise and relevant.
 
     Context: {context}"""
 
@@ -408,22 +286,17 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
         ("human", "{input}"),
     ])
 
-    # Create the document chain
     question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
-    
-    # Create the retrieval chain
     rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
     
-    # Set up conversation history storage with a context window
+    # Setup conversation history store
     store = {}
-    CONTEXT_WINDOW_SIZE = 12  # Keep track of 12 messages (6 exchanges)
-
     def get_session_history(session_id):
         if session_id not in store:
-            store[session_id] = WindowedChatMessageHistory(window_size=CONTEXT_WINDOW_SIZE)
+            store[session_id] = WindowedChatMessageHistory(window_size=history_window_size)
         return store[session_id]
     
-    # Create a stateful conversational chain
+    # Create the stateful chain
     conversational_rag_chain = RunnableWithMessageHistory(
         rag_chain,
         get_session_history,
@@ -432,7 +305,7 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
         output_messages_key="answer",
     )
 
-    # Create a wrapper function to match your existing interface
+    # Wrapper function for the API
     def qa_function(question, reset_conversation=False, session_id="default"):
         if reset_conversation:
             if session_id in store:
@@ -448,30 +321,30 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
 
     return qa_function
 
-def test_rag_pipeline(rag_pipeline):
-    # Test with conversational queries that build upon each other
-    conversation = [
-        "Who is the 45th president of the USA?",
-        "When did he take office?",
-        "What were some major policies during his term?",
-        "What year was the Shinkansen name first used?",
-        "How fast can these trains go?",
-    ]
-    
-    print("Testing conversational capabilities:")
-    for question in conversation:
-        response = rag_pipeline(question)
-        print(f"Q: {question}")
-        print(f"A: {response}")
-        print("-" * 50)
 
-
+# Main execution block (optional, for testing or standalone runs)
 if __name__ == "__main__":
     try:
+        print("Initializing RAG pipeline components...")
         chunks = load_and_chunk_documents()
-        embedding_model = generate_embeddings(chunks)
-        vectorstore = create_vector_store(chunks, embedding_model)
-        rag_pipeline = build_rag_pipeline(vectorstore)
-        test_rag_pipeline(rag_pipeline)
+        if chunks:
+            embedding_model = generate_embeddings(chunks)
+            vectorstore = create_vector_store(chunks, embedding_model)
+            if vectorstore:
+                rag_pipeline = build_rag_pipeline(vectorstore)
+                if rag_pipeline:
+                    print("RAG Pipeline built successfully. Ready for testing or API.")
+                    # Example test query (optional)
+                    # test_question = "What are incipient cable faults?"
+                    # print(f"\nTesting with: '{test_question}'")
+                    # response = rag_pipeline(test_question)
+                    # print(f"Response: {response}")
+                else:
+                    print("Failed to build RAG pipeline.")
+            else:
+                print("Failed to create vector store.")
+        else:
+            print("No document chunks loaded, cannot build pipeline.")
+            
     except Exception as e:
-        print(f"Error in RAG pipeline execution: {e}")
+        print(f"Error during initial setup: {e}")

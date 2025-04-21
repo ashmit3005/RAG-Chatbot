@@ -26,8 +26,8 @@ class App extends Component {
       statusMessage: "", 
       statusType: "",
       isProcessingFiles: false,
-      processedFileNames: [], // Add this to track already processed files
-      filesDropdownOpen: false // Add state for files dropdown
+      processedFileNames: [], // Track already processed files
+      filesDropdownOpen: false // State for files dropdown
     };
 
     // Ensure attachedFiles is always initialized
@@ -37,10 +37,10 @@ class App extends Component {
 
     this.state = savedState;
     this.statusTimeoutId = null; // For tracking the status message timeout
-    this.textFieldRef = React.createRef(); // Create a reference for the TextField
+    this.textFieldRef = React.createRef(); // Reference for the TextField
   }
 
-  // Add componentDidUpdate to save state changes
+  // Save state changes to localStorage
   componentDidUpdate(prevProps, prevState) {
     // Only save specific state properties we want to persist
     const stateToSave = {
@@ -54,7 +54,7 @@ class App extends Component {
     localStorage.setItem('chatbotState', JSON.stringify(stateToSave));
   }
 
-  // New method for displaying status messages with auto-clear
+  // Display status messages with auto-clear
   displayStatusMessage = (message, type = 'success') => {
     // Clear any existing timeout
     if (this.statusTimeoutId) {
@@ -76,24 +76,21 @@ class App extends Component {
     }, 5000);
   };
 
-  // Add this helper function to generate a title from conversation
+  // Generate a title from the first user message and bot response
   generateConversationTitle = (messages) => {
     if (!messages || messages.length < 2) return "New Chat";
     
-    // Get the first user message and bot response
     const userMessage = messages[0].text || "";
     const botResponse = messages[1].text || "";
-    
-    // Combine both messages and create a title
     const combinedText = userMessage + " " + botResponse;
     
-    // Create title: Take first 10 chars of meaningful words
+    // Create title: Take first few meaningful words
     const title = combinedText
       .split(/\s+/)
       .filter(word => word.length > 3)  // Filter out small words
       .slice(0, 2)  // Take first two meaningful words
       .join(" ")
-      .substring(0, 30);  // Limit to 10 characters
+      .substring(0, 30); // Limit length
       
     return title || "New Chat";
   };
@@ -106,7 +103,7 @@ class App extends Component {
         // Create new conversation
         const newConversation = {
           messages: [message],
-          name: "New Chat"  // Temporary name
+          name: "New Chat" // Temporary name
         };
         
         const updatedConversations = [...prevState.conversations, newConversation];
@@ -139,23 +136,15 @@ class App extends Component {
     });
   };
 
-  // New method to reset the TextField height/spacing
+  // Reset the TextField height/spacing and clear its value
   resetTextField = () => {
     if (this.textFieldRef.current) {
       const textField = this.textFieldRef.current;
-      
-      // Access the input element
       if (textField.querySelector('textarea')) {
         const textareaElement = textField.querySelector('textarea');
-        
-        // Force complete reset by clearing/setting various properties
         textareaElement.value = '';
-        
-        // Clear any selection and ensure cursor is at the beginning
         textareaElement.setSelectionRange(0, 0);
-        
-        // Remove any content, including hidden newlines
-        textareaElement.innerHTML = '';
+        textareaElement.innerHTML = ''; // Ensure no hidden content remains
       }
     }
   };
@@ -170,26 +159,23 @@ class App extends Component {
     if (!input.trim() && (!attachedFiles || attachedFiles.length === 0)) return;
 
     try {
-      // Add message to chat immediately - always include files in the UI
+      // Add message to chat immediately
       const displayMessage = input.trim() || `Uploaded ${attachedFiles.length} file(s)`;
       this.addMessage("user", displayMessage, attachedFiles);
       
-      // First reset the input value in state
+      // Reset input state and trigger text field reset
       this.setState({ 
-        input: "", // Clear input completely
+        input: "", 
         isLoading: true, 
         attachedFiles: attachedFiles, 
-        isProcessingFiles: false // No need to process files again
+        isProcessingFiles: false 
       }, () => {
-        // Completely reset the text field after the state has been updated
         this.resetTextField();
-        
-        // Additional reset for MUI TextField to ensure no newlines remain
+        // Additional reset for MUI TextField just in case
         const textField = this.textFieldRef.current;
         if (textField) {
           const textareaElement = textField.querySelector('textarea');
           if (textareaElement) {
-            // Force clear any remaining content or state
             textareaElement.value = '';
             textareaElement.defaultValue = '';
           }
@@ -200,28 +186,20 @@ class App extends Component {
       const formData = new FormData();
       formData.append('message', input.trim());
 
-      // Check which files need to be sent and which are already processed
+      // Attach files if present and not already processed
       if (attachedFiles && attachedFiles.length > 0) {
-        // Filter out files that have already been processed
         const unprocessedFiles = attachedFiles.filter(file => 
           !processedFileNames.includes(file.name)
         );
 
-        // Only attach files that haven't been processed yet
         unprocessedFiles.forEach((file, index) => {
-          console.log(`Attaching unprocessed file ${index}:`, file.name, file.type);
           formData.append(`file${index}`, file, file.name);
         });
 
-        // If we have already processed files, send their names to inform the backend
+        // Inform backend about already processed files
         if (processedFileNames.length > 0) {
           formData.append('processedFiles', JSON.stringify(processedFileNames));
         }
-      }
-
-      // Log FormData contents for debugging
-      for (let pair of formData.entries()) {
-        console.log('FormData contains:', pair[0], pair[1]);
       }
 
       const response = await fetch('http://localhost:5000/api/chat', {
@@ -236,15 +214,14 @@ class App extends Component {
 
       const data = await response.json();
 
-      // Process the response text to convert newlines to <br> elements
+      // Format response and add to chat
       const formattedResponse = data.response.replace(/\n/g, '<br>').replace(/•/g, '&bull;');
       this.addMessage("bot", formattedResponse);
 
-      // Clear attached files after successful send
+      // Clear attached files after successful send, keep track of processed ones
       this.setState({ 
         attachedFiles: [],
-        // Keep track of processed files in case we need them for future reference
-        processedFileNames: [...processedFileNames]
+        processedFileNames: [...processedFileNames, ...(data.uploaded_files || [])] // Update processed files list
       });
     } catch (error) {
       console.error("Error sending message:", error);
@@ -260,16 +237,13 @@ class App extends Component {
 
   handleKeyPress = (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault(); // Prevent default to avoid adding a newline
+      event.preventDefault(); // Prevent adding a newline
       this.handleSend();
     }
   };
 
   handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
-    console.log('Files selected:', files.map(f => f.name));  // Debug log
-
-    // Ensure attachedFiles exists before checking length
     const currentAttachedFiles = this.state.attachedFiles || [];
 
     if (currentAttachedFiles.length + files.length > this.state.maxFiles) {
@@ -277,24 +251,20 @@ class App extends Component {
       return;
     }
 
-    // First update UI to show selected files and set processing state
+    // Update UI immediately
     this.setState(prevState => ({
       attachedFiles: [...(prevState.attachedFiles || []), ...files],
       isLoading: true, 
-      isProcessingFiles: true // Set file processing indicator
+      isProcessingFiles: true 
     }));
 
     try {
-      // Create FormData for immediate upload
+      // Upload files immediately
       const formData = new FormData();
-
-      // Append each file with unique field name
       files.forEach((file, index) => {
-        console.log(`Attaching file ${index} for immediate upload:`, file.name, file.type);
         formData.append(`file${index}`, file, file.name);
       });
 
-      // Use dedicated upload endpoint for better separation of concerns
       const response = await fetch('http://localhost:5000/api/upload_new_files', {
         method: 'POST',
         body: formData
@@ -307,34 +277,31 @@ class App extends Component {
 
       const data = await response.json();
 
-      // Store the names of successfully processed files
+      // Store names of successfully processed files
       if (data.uploaded_files && data.uploaded_files.length > 0) {
         this.setState(prevState => ({
           processedFileNames: [...(prevState.processedFileNames || []), ...data.uploaded_files]
         }));
       }
 
-      // Display status message instead of adding a chat message
+      // Display status message
       const uploadMessage = data.message || `Files uploaded successfully: ${files.map(f => f.name).join(', ')}`;
       this.displayStatusMessage(uploadMessage, 'success');
-      console.log("Files uploaded successfully:", data.uploaded_files);
     } catch (error) {
       console.error("Error uploading files:", error);
-      // Display error message as status
       this.displayStatusMessage(`Error uploading files: ${error.message}`, 'error');
-      
-      // Remove the failed files from state
+      // Remove failed files from state
       this.setState(prevState => ({
         attachedFiles: prevState.attachedFiles.filter(f => !files.includes(f))
       }));
     } finally {
-      // Clear loading states after processing completes
+      // Clear loading states
       this.setState({ isLoading: false, isProcessingFiles: false });
     }
   };
 
   startNewConversation = () => {
-    // Reset processed files when starting a new conversation
+    // Reset state for a new conversation
     this.setState({ 
       activeConversation: null, 
       input: "", 
@@ -351,7 +318,7 @@ class App extends Component {
     this.setState((prevState) => ({ darkMode: !prevState.darkMode }));
   };
 
-  // Add a method to clear saved state
+  // Clear saved state from localStorage and reload
   clearSavedState = () => {
     localStorage.removeItem('chatbotState');
     window.location.reload();
@@ -381,7 +348,7 @@ class App extends Component {
   };
 
   render() {
-    // Destructure with defaults to prevent undefined errors
+    // Destructure state with defaults
     const { 
       conversations = [], 
       activeConversation, 
@@ -402,7 +369,8 @@ class App extends Component {
 
     return (
       <div className={`app-container ${darkMode ? "dark-mode" : "light-mode"}`}>
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        {/* Top Right Controls */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
           <FontAwesomeIcon icon={faSun} className="text-gray-400 text-lg" />
           <Switch checked={darkMode} onChange={this.toggleDarkMode} />
           <FontAwesomeIcon icon={faMoon} className="text-gray-400 text-lg" />
@@ -413,6 +381,8 @@ class App extends Component {
             Clear History
           </button>
         </div>
+        
+        {/* Main Layout */}
         <div className={`chat-layout ${this.state.isOpen ? "sidebar-expanded" : ""}`}>
           <ChatHistory 
             conversations={conversations} 
@@ -421,11 +391,16 @@ class App extends Component {
             selectedConversation={activeConversation} 
             toggleSidebar={(isOpen) => this.setState({ isOpen })} 
           />
+          
+          {/* Chat Container */}
           <motion.div className={`chat-container ${!this.state.isOpen ? "expanded" : ""}`}>
+            {/* Chat Header */}
             <div className="chat-header flex items-center gap-2 p-4">
               <PowerIcon className="text-[var(--text-color)]" fontSize="large" />
               <h1 className="text-4xl font-bold text-[var(--text-color)]">PowerWise - A Power Quality ChatBot</h1>
             </div>
+            
+            {/* Chat Window */}
             <div className="chat-window p-4 mb-4 mx-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-y-auto">
               {currentMessages.map((msg, index) => (
                 <motion.div
@@ -440,18 +415,17 @@ class App extends Component {
                       ? "bg-purple-600 text-white ml-auto" 
                       : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 mr-auto"
                   }`}>
+                    {/* Render bot message HTML or user text */}
                     {msg.sender === "bot" ? (
                       <div 
                         dangerouslySetInnerHTML={{ __html: msg.text }} 
                         className="bot-message"
-                        style={{
-                          lineHeight: "1.5",
-                          overflow: "auto"
-                        }}
+                        style={{ lineHeight: "1.5", overflow: "auto" }}
                       />
                     ) : (
                       msg.text
                     )}
+                    {/* Display attached files for user messages */}
                     {msg.files && msg.files.length > 0 && (
                       <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/20">
                         {msg.files.map((file, fileIndex) => (
@@ -467,6 +441,7 @@ class App extends Component {
                   </div>
                 </motion.div>
               ))}
+              {/* Loading indicator */}
               {this.state.isLoading && (
                 <motion.div 
                   className="flex justify-start mt-6"
@@ -483,8 +458,10 @@ class App extends Component {
                 </motion.div>
               )}
             </div>
+            
+            {/* Input Area */}
             <div className="input-area relative flex flex-col p-4 rounded-lg shadow-lg bg-[var(--chat-bg)] text-[var(--text-color)] mb-8 mx-10">
-              {/* Files dropdown toggle - always show when files are attached */}
+              {/* Files dropdown toggle */}
               {attachedFiles.length > 0 && (
                 <div className="flex items-center justify-between px-2 py-2">
                   <button 
@@ -496,7 +473,7 @@ class App extends Component {
                   </button>
                 </div>
               )}
-              {/* Expanded files list - position it above the toggle */}
+              {/* Expanded files list */}
               {filesDropdownOpen && attachedFiles.length > 0 && (
                 <div className="absolute bottom-full left-4 right-4 mx-auto bg-[var(--chat-bg)] rounded-t-lg shadow-lg max-h-48 overflow-y-auto z-10">
                   <div className="flex flex-col gap-2 p-3">
@@ -510,6 +487,7 @@ class App extends Component {
                           </div>
                           <span className="text-sm truncate text-[var(--text-color)]">{file.name}</span>
                         </div>
+                        {/* Remove file button */}
                         <button 
                           onClick={() => {
                             const newFiles = [...attachedFiles];
@@ -540,7 +518,7 @@ class App extends Component {
                   {statusMessage}
                 </div>
               )}
-              {/* Input area and buttons */}
+              {/* Input field and buttons */}
               <div className="flex items-center gap-2">
                 <div className="flex-grow px-2 w-[100%]" ref={this.textFieldRef}>
                   <TextField 
@@ -595,18 +573,19 @@ class App extends Component {
                         type="file" 
                         onChange={this.handleFileUpload} 
                         className="hidden" 
-                        accept=".pdf,.doc,.docx,.txt"
+                        accept=".pdf,.doc,.docx,.txt" // Note: Backend currently only allows PDF
                         multiple
                         disabled={attachedFiles.length >= this.state.maxFiles || isProcessingFiles}
                       />
                       <FontAwesomeIcon icon={faPlus} className="text-[var(--btn-text)] text-xl" />
                     </label>
+                    {/* Tooltip */}
                     <span className="absolute -top-14 left-1/2 transform -translate-x-1/2 scale-0 group-hover:scale-100 transition bg-[var(--chat-bg)] text-[var(--text-color)] text-sm font-semibold px-2 py-1 rounded-md shadow-md border border-[var(--text-color)]">
                       {isProcessingFiles ? 'Processing files...' : 
                         attachedFiles.length >= this.state.maxFiles ? 'Max files reached' : 'Attach File'}
                     </span>
                   </div>
-                  {/* Send Button with Loading Indicator */}
+                  {/* Send Button */}
                   <div className="relative flex items-center">
                     <button
                       onClick={this.handleSend}
@@ -617,7 +596,7 @@ class App extends Component {
                     >
                       <FontAwesomeIcon icon={faArrowUp} className="text-[var(--btn-text)]" />
                     </button>
-                    {/* File processing spinner - moved to be aligned with button */}
+                    {/* File processing spinner */}
                     {isProcessingFiles && (
                       <div className="ml-3">
                         <div className="w-6 h-6 border-2 border-t-transparent border-purple-500 rounded-full animate-spin"></div>
@@ -628,6 +607,8 @@ class App extends Component {
               </div>  
             </div>
           </motion.div>
+          
+          {/* FAQ Section */}
           <div className="faq-section-wrapper">
             <FAQSection />
           </div>

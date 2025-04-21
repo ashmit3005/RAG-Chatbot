@@ -25,8 +25,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(current_dir, 'Uploaded Documents')
 ALLOWED_EXTENSIONS = {'pdf'}
 
-print(f"Setting upload folder to: {UPLOAD_FOLDER}")
-
 def allowed_file(filename):
     return filename.lower().endswith('.pdf')
 
@@ -50,9 +48,7 @@ def initialize_rag_pipeline():
         global_embedding_model = generate_embeddings(chunks)
         global_vectorstore = create_vector_store(chunks, global_embedding_model)
         global_rag_pipeline = build_rag_pipeline(global_vectorstore)
-        print("RAG pipeline initialized successfully")
     except Exception as e:
-        print(f"Error initializing RAG pipeline: {e}")
         global_rag_pipeline = None
         global_vectorstore = None
         global_embedding_model = None
@@ -70,17 +66,11 @@ async def chat(
     global global_rag_pipeline, global_vectorstore, global_embedding_model
     
     try:
-        # Debug logging
-        print("Received request")
-        
         # Process processed_files JSON
         try:
             processed_files_list = json.loads(processed_files) if processed_files else []
-            if processed_files_list:
-                print(f"Already processed files: {processed_files_list}")
         except json.JSONDecodeError:
             processed_files_list = []
-            print("Error parsing processed files JSON")
         
         # Handle file uploads if present
         uploaded_files = []
@@ -95,7 +85,6 @@ async def chat(
                     filename = secure_filename(file.filename)
                     # Skip processing if this file was already processed
                     if filename in processed_files_list:
-                        print(f"Skipping already processed file: {filename}")
                         continue
                         
                     filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -107,9 +96,7 @@ async def chat(
                     
                     uploaded_files.append(filename)
                     uploaded_file_paths.append(filepath)
-                    print(f"Successfully saved file to: {filepath}")
                 except Exception as e:
-                    print(f"Error saving file {file.filename}: {e}")
                     raise HTTPException(status_code=500, detail=f"Error saving file {file.filename}: {str(e)}")
             else:
                 if file and file.filename:
@@ -120,7 +107,6 @@ async def chat(
         
         # If files were uploaded and we have an existing vectorstore, add them to it
         if uploaded_file_paths:
-            print(f"New files uploaded: {uploaded_files}")
             if global_vectorstore is not None and global_embedding_model is not None:
                 # Process each new file individually and add to the vectorstore
                 for file_path in uploaded_file_paths:
@@ -130,29 +116,24 @@ async def chat(
                 
                 # Update the RAG pipeline with the updated vectorstore
                 global_rag_pipeline = build_rag_pipeline(global_vectorstore)
-                print("Updated RAG pipeline with new documents")
             else:
                 # If we don't have a vectorstore yet, initialize the full pipeline
                 initialize_rag_pipeline()
             
         # Initialize pipeline if it's not already initialized
         if global_rag_pipeline is None:
-            print("Initializing RAG pipeline")
             initialize_rag_pipeline()
             
         if global_rag_pipeline is None:
             raise HTTPException(status_code=500, detail="Failed to initialize RAG pipeline")
             
         # Process the query (if no message but files uploaded, acknowledge the upload)
-        print(f"Processing message: '{message}'")
         if not message and all_referenced_files:
             response = f"Files ready to use: {', '.join(all_referenced_files)}"
         else:
             try:
                 response = global_rag_pipeline(message, session_id=session_id) if message else "Files uploaded successfully"
-                print(f"Generated raw response: '{response[0:50]}...'") # Print first 50 chars of response
             except Exception as e:
-                print(f"Error generating response: {e}")
                 raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
         
         # Create the response data
@@ -161,16 +142,12 @@ async def chat(
             "uploaded_files": all_referenced_files  # Include all referenced files in the response
         }
 
-        print("Sending response")
         return response_data
         
     except HTTPException as e:
         # Re-raise FastAPI exceptions
         raise
     except Exception as e:
-        print(f"Error processing request: {e}")
-        import traceback
-        traceback.print_exc()  # Print full stack trace
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/upload_new_files")
@@ -187,8 +164,6 @@ async def upload_new_files(files: List[UploadFile] = File(...)):
             
         # Ensure the upload directory exists
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-        print(f"Processing {len(files)} files")
         
         for file in files:
             if file and file.filename and allowed_file(file.filename):
@@ -203,9 +178,7 @@ async def upload_new_files(files: List[UploadFile] = File(...)):
                     
                     uploaded_files.append(filename)
                     uploaded_file_paths.append(filepath)
-                    print(f"Successfully saved file to: {filepath}")
                 except Exception as e:
-                    print(f"Error saving file {file.filename}: {e}")
                     raise HTTPException(status_code=500, detail=f"Error saving file {file.filename}: {str(e)}")
             else:
                 raise HTTPException(status_code=400, detail="Invalid file format. Only PDF files are allowed.")
@@ -219,7 +192,6 @@ async def upload_new_files(files: List[UploadFile] = File(...)):
             
             # Update the RAG pipeline with the updated vectorstore
             global_rag_pipeline = build_rag_pipeline(global_vectorstore)
-            print("Updated RAG pipeline with new documents")
         else:
             # If we don't have a vectorstore yet, initialize the full pipeline
             initialize_rag_pipeline()
@@ -233,13 +205,9 @@ async def upload_new_files(files: List[UploadFile] = File(...)):
         # Re-raise FastAPI exceptions
         raise
     except Exception as e:
-        print(f"Error processing file upload: {e}")
-        import traceback
-        traceback.print_exc()  # Print full stack trace
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == '__main__':
     # Ensure upload directory exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    print(f"Upload directory set to: {UPLOAD_FOLDER}")
     uvicorn.run(app, host="0.0.0.0", port=5000)
