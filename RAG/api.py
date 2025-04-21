@@ -1,14 +1,24 @@
 import os
 import json
-from flask import Flask, request, jsonify, session
-from flask_cors import CORS
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import List, Optional, Dict, Any
+import uvicorn
 from werkzeug.utils import secure_filename
 from rag_pipeline import load_and_chunk_documents, generate_embeddings, create_vector_store, build_rag_pipeline, format_response, load_single_document, update_vector_store
 from langchain_community.chat_message_histories import ChatMessageHistory
 
-app = Flask(__name__)
-CORS(app)
-app.secret_key = os.urandom(24)  # For session management
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Configure upload settings
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,16 +27,8 @@ ALLOWED_EXTENSIONS = {'pdf'}
 
 print(f"Setting upload folder to: {UPLOAD_FOLDER}")
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
 def allowed_file(filename):
     return filename.lower().endswith('.pdf')
-
-# Global variables for the RAG pipeline and its components
-global_rag_pipeline = None
-global_vectorstore = None
-global_embedding_model = None
 
 # With a session store similar to your example
 store = {}
@@ -35,6 +37,11 @@ def get_session_history(session_id):
     if session_id not in store:
         store[session_id] = ChatMessageHistory()
     return store[session_id]
+
+# Global variables for the RAG pipeline and its components
+global_rag_pipeline = None
+global_vectorstore = None
+global_embedding_model = None
 
 def initialize_rag_pipeline():
     global global_rag_pipeline, global_vectorstore, global_embedding_model
@@ -53,62 +60,63 @@ def initialize_rag_pipeline():
 # Initialize the pipeline when starting the server
 initialize_rag_pipeline()
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
+@app.post("/api/chat")
+async def chat(
+    message: Optional[str] = Form(None),
+    session_id: str = Form("default"),
+    processed_files: Optional[str] = Form(None),
+    files: List[UploadFile] = []
+):
     global global_rag_pipeline, global_vectorstore, global_embedding_model
     
     try:
         # Debug logging
         print("Received request")
         
-        # Get the message text (can be empty)
-        message = request.form.get('message', '')
-
-        # Get session ID (you could use cookies or other methods)
-        session_id = request.form.get('session_id', 'default')
-        
-        # Check if there are any previously processed files
-        processed_files_json = request.form.get('processedFiles', '[]')
+        # Process processed_files JSON
         try:
-            processed_files = json.loads(processed_files_json) if processed_files_json else []
-            if processed_files:
-                print(f"Already processed files: {processed_files}")
+            processed_files_list = json.loads(processed_files) if processed_files else []
+            if processed_files_list:
+                print(f"Already processed files: {processed_files_list}")
         except json.JSONDecodeError:
-            processed_files = []
+            processed_files_list = []
             print("Error parsing processed files JSON")
         
         # Handle file uploads if present
         uploaded_files = []
         uploaded_file_paths = []
         
-        # Look for files with indexed names (file0, file1, etc.)
-        file_keys = [key for key in request.files.keys() if key.startswith('file')]
+        # Ensure the upload directory exists
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         
-        if file_keys:
-            # Ensure the upload directory exists
-            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-            
-            for key in file_keys:
-                file = request.files[key]
-                if file and file.filename and allowed_file(file.filename):
-                    try:
-                        filename = secure_filename(file.filename)
-                        # Skip processing if this file was already processed
-                        if filename in processed_files:
-                            print(f"Skipping already processed file: {filename}")
-                            continue
-                            
-                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                        file.save(filepath)
-                        uploaded_files.append(filename)
-                        uploaded_file_paths.append(filepath)
-                        print(f"Successfully saved file to: {filepath}")
-                    except Exception as e:
-                        print(f"Error saving file {file.filename}: {e}")
-                        return jsonify({"error": f"Error saving file {file.filename}: {str(e)}"}), 500
+        for file in files:
+            if file and file.filename and allowed_file(file.filename):
+                try:
+                    filename = secure_filename(file.filename)
+                    # Skip processing if this file was already processed
+                    if filename in processed_files_list:
+                        print(f"Skipping already processed file: {filename}")
+                        continue
+                        
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+                    
+                    # Save the file
+                    content = await file.read()
+                    with open(filepath, "wb") as f:
+                        f.write(content)
+                    
+                    uploaded_files.append(filename)
+                    uploaded_file_paths.append(filepath)
+                    print(f"Successfully saved file to: {filepath}")
+                except Exception as e:
+                    print(f"Error saving file {file.filename}: {e}")
+                    raise HTTPException(status_code=500, detail=f"Error saving file {file.filename}: {str(e)}")
+            else:
+                if file and file.filename:
+                    raise HTTPException(status_code=400, detail="Invalid file format. Only PDF files are allowed.")
         
         # Get a list of all files referenced in this request (newly uploaded + previously processed)
-        all_referenced_files = uploaded_files + processed_files
+        all_referenced_files = uploaded_files + processed_files_list
         
         # If files were uploaded and we have an existing vectorstore, add them to it
         if uploaded_file_paths:
@@ -132,6 +140,9 @@ def chat():
             print("Initializing RAG pipeline")
             initialize_rag_pipeline()
             
+        if global_rag_pipeline is None:
+            raise HTTPException(status_code=500, detail="Failed to initialize RAG pipeline")
+            
         # Process the query (if no message but files uploaded, acknowledge the upload)
         print(f"Processing message: '{message}'")
         if not message and all_referenced_files:
@@ -142,7 +153,7 @@ def chat():
                 print(f"Generated raw response: '{response[0:50]}...'") # Print first 50 chars of response
             except Exception as e:
                 print(f"Error generating response: {e}")
-                return jsonify({"error": f"Error generating response: {str(e)}"}), 500
+                raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
         
         # Create the response data
         response_data = {
@@ -151,16 +162,19 @@ def chat():
         }
 
         print("Sending response")
-        return jsonify(response_data)
+        return response_data
         
+    except HTTPException as e:
+        # Re-raise FastAPI exceptions
+        raise
     except Exception as e:
         print(f"Error processing request: {e}")
         import traceback
         traceback.print_exc()  # Print full stack trace
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route('/api/upload_new_files', methods=['POST'])
-def upload_new_files():
+@app.post("/api/upload_new_files")
+async def upload_new_files(files: List[UploadFile] = File(...)):
     global global_rag_pipeline, global_vectorstore, global_embedding_model
     
     try:
@@ -168,32 +182,33 @@ def upload_new_files():
         uploaded_files = []
         uploaded_file_paths = []
         
-        # Look for files with indexed names (file0, file1, etc.)
-        file_keys = [key for key in request.files.keys() if key.startswith('file')]
-        
-        if not file_keys:
-            return jsonify({"error": "No files provided"}), 400
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
             
         # Ensure the upload directory exists
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-        print(file_keys)
+        print(f"Processing {len(files)} files")
         
-        for key in file_keys:
-            file = request.files[key]
+        for file in files:
             if file and file.filename and allowed_file(file.filename):
                 try:
                     filename = secure_filename(file.filename)
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+                    
+                    # Save the file
+                    content = await file.read()
+                    with open(filepath, "wb") as f:
+                        f.write(content)
+                    
                     uploaded_files.append(filename)
                     uploaded_file_paths.append(filepath)
                     print(f"Successfully saved file to: {filepath}")
                 except Exception as e:
                     print(f"Error saving file {file.filename}: {e}")
-                    return jsonify({"error": f"Error saving file {file.filename}: {str(e)}"}), 500
+                    raise HTTPException(status_code=500, detail=f"Error saving file {file.filename}: {str(e)}")
             else:
-                return jsonify({"error": f"Invalid file format. Only PDF files are allowed."}), 400
+                raise HTTPException(status_code=400, detail="Invalid file format. Only PDF files are allowed.")
         
         # Process each new file individually and add to the vectorstore
         if global_vectorstore is not None and global_embedding_model is not None:
@@ -209,19 +224,22 @@ def upload_new_files():
             # If we don't have a vectorstore yet, initialize the full pipeline
             initialize_rag_pipeline()
         
-        return jsonify({
+        return {
             "message": f"Successfully uploaded and processed {len(uploaded_files)} file(s): {', '.join(uploaded_files)}",
             "uploaded_files": uploaded_files
-        })
+        }
         
+    except HTTPException as e:
+        # Re-raise FastAPI exceptions
+        raise
     except Exception as e:
         print(f"Error processing file upload: {e}")
         import traceback
         traceback.print_exc()  # Print full stack trace
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == '__main__':
     # Ensure upload directory exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     print(f"Upload directory set to: {UPLOAD_FOLDER}")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    uvicorn.run(app, host="0.0.0.0", port=5000)

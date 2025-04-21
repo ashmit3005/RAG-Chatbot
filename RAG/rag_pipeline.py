@@ -348,21 +348,32 @@ class WindowedChatMessageHistory(ChatMessageHistory):
             window_size (int): Maximum number of messages (human + AI) to retain
         """
         super().__init__()
-        self.window_size = window_size
+        self._window_size = window_size  # Use a protected attribute name
+        
+    @property
+    def window_size(self):
+        """Property to safely access the window size."""
+        return self._window_size
+        
+    @window_size.setter
+    def window_size(self, value):
+        """Property setter for window size."""
+        self._window_size = value
         
     def add_message(self, message: BaseMessage) -> None:
         """Add a message to the history, maintaining the window size."""
         super().add_message(message)
         # Trim the history if it exceeds the window size
-        if len(self.messages) > self.window_size:
+        if len(self.messages) > self._window_size:  # Use the protected attribute
             # Remove oldest messages to maintain window size
-            self.messages = self.messages[-self.window_size:]
+            self.messages = self.messages[-self._window_size:]
 
 def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
     # Initialize llm
     llm = ChatOpenAI(
         model=llm, 
-        temperature=0.3
+        temperature=0.3,
+        max_tokens=750
     )
     
     contextualize_q_prompt = ChatPromptTemplate.from_messages([
@@ -384,6 +395,10 @@ def build_rag_pipeline(vectorstore, llm="gpt-4o-mini", existing_history=None):
     and relevant to the question and document content.
     If you don't know the answer or if the context doesn't contain relevant information, say you don't have enough information to answer.
     Remain conversational and engaging in your responses while keeping the answers concise and relevant.
+
+    IMPORTANT CONSTRAINTS:       
+    1. Focus on direct answers rather than lengthy explanations.
+    2. If you don't know the answer or if the context doesn't contain relevant information, say you don't have enough information to answer.
 
     Context: {context}"""
 
