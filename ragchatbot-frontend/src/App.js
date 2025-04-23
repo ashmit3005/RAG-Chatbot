@@ -185,6 +185,8 @@ class App extends Component {
       // Create FormData
       const formData = new FormData();
       formData.append('message', input.trim());
+      // Append session_id if needed by your backend logic for chat history
+      formData.append('session_id', this.state.activeConversation !== null ? `conv_${this.state.activeConversation}` : 'default'); // Example session ID
 
       // Attach files if present and not already processed
       if (attachedFiles && attachedFiles.length > 0) {
@@ -192,15 +194,24 @@ class App extends Component {
           !processedFileNames.includes(file.name)
         );
 
-        unprocessedFiles.forEach((file, index) => {
-          formData.append(`file${index}`, file, file.name);
+        // *** CHANGE HERE: Use 'files' as the key for all files ***
+        unprocessedFiles.forEach((file) => {
+          formData.append(`files`, file, file.name); // Use 'files' key
         });
 
         // Inform backend about already processed files
         if (processedFileNames.length > 0) {
-          formData.append('processedFiles', JSON.stringify(processedFileNames));
+          // Ensure processed_files is sent as a JSON string
+          formData.append('processed_files', JSON.stringify(processedFileNames));
+        } else {
+          // Send empty list if no files were previously processed
+           formData.append('processed_files', JSON.stringify([]));
         }
+      } else {
+         // Send empty list if no files are attached now
+         formData.append('processed_files', JSON.stringify(processedFileNames)); // Still send processed files list
       }
+
 
       const response = await fetch('http://localhost:5000/api/chat', {
         method: 'POST',
@@ -218,14 +229,25 @@ class App extends Component {
       const formattedResponse = data.response.replace(/\n/g, '<br>').replace(/•/g, '&bull;');
       this.addMessage("bot", formattedResponse);
 
-      // Clear attached files after successful send, keep track of processed ones
+      // Update processed files list based on response
+      if (data.uploaded_files && Array.isArray(data.uploaded_files)) {
+          // Use Set for efficient merging and deduplication
+          const updatedProcessedNames = new Set([...processedFileNames, ...data.uploaded_files]);
+          this.setState({
+              processedFileNames: Array.from(updatedProcessedNames)
+          });
+      }
+
+      // Clear attached files after successful send
       this.setState({ 
-        attachedFiles: [],
-        processedFileNames: [...processedFileNames, ...(data.uploaded_files || [])] // Update processed files list
+        attachedFiles: []
+        // Keep processedFileNames updated
       });
     } catch (error) {
       console.error("Error sending message:", error);
       this.displayStatusMessage(`Error: ${error.message}`, 'error');
+      // Optionally clear attached files on error too, or leave them for retry
+      // this.setState({ attachedFiles: [] }); 
     } finally {
       this.setState({ isLoading: false, isProcessingFiles: false });
     }
@@ -245,24 +267,37 @@ class App extends Component {
   handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     const currentAttachedFiles = this.state.attachedFiles || [];
+    const processedFileNames = this.state.processedFileNames || []; // Get current processed files
 
-    if (currentAttachedFiles.length + files.length > this.state.maxFiles) {
-      this.displayStatusMessage(`Maximum ${this.state.maxFiles} files allowed`, 'error');
+    // Filter out files that are already processed or currently attached
+    const newFilesToUpload = files.filter(file => 
+        !processedFileNames.includes(file.name) && 
+        !currentAttachedFiles.some(attached => attached.name === file.name)
+    );
+
+    if (newFilesToUpload.length === 0) {
+        this.displayStatusMessage("Selected file(s) already attached or processed.", 'info');
+        return; // Nothing new to upload
+    }
+
+    if (currentAttachedFiles.length + newFilesToUpload.length > this.state.maxFiles) {
+      this.displayStatusMessage(`Cannot add ${newFilesToUpload.length} file(s). Maximum ${this.state.maxFiles} files allowed in total.`, 'error');
       return;
     }
 
-    // Update UI immediately
+    // Update UI immediately with only the new files
     this.setState(prevState => ({
-      attachedFiles: [...(prevState.attachedFiles || []), ...files],
+      attachedFiles: [...(prevState.attachedFiles || []), ...newFilesToUpload],
       isLoading: true, 
       isProcessingFiles: true 
     }));
 
     try {
-      // Upload files immediately
+      // Upload only the new files
       const formData = new FormData();
-      files.forEach((file, index) => {
-        formData.append(`file${index}`, file, file.name);
+      // *** CHANGE HERE: Use 'files' as the key for all files ***
+      newFilesToUpload.forEach((file) => {
+        formData.append(`files`, file, file.name); // Use 'files' key
       });
 
       const response = await fetch('http://localhost:5000/api/upload_new_files', {
@@ -272,31 +307,36 @@ class App extends Component {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        // Use detail field from FastAPI HTTPException if available
+        throw new Error(errorData.detail || errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
 
-      // Store names of successfully processed files
+      // Store names of successfully processed files from this upload
       if (data.uploaded_files && data.uploaded_files.length > 0) {
         this.setState(prevState => ({
-          processedFileNames: [...(prevState.processedFileNames || []), ...data.uploaded_files]
+          // Use Set to avoid duplicates if backend sends overlapping names
+          processedFileNames: [...new Set([...(prevState.processedFileNames || []), ...data.uploaded_files])]
         }));
       }
 
-      // Display status message
-      const uploadMessage = data.message || `Files uploaded successfully: ${files.map(f => f.name).join(', ')}`;
+      // Display status message from backend
+      const uploadMessage = data.message || `Files uploaded successfully: ${newFilesToUpload.map(f => f.name).join(', ')}`;
       this.displayStatusMessage(uploadMessage, 'success');
+
     } catch (error) {
       console.error("Error uploading files:", error);
       this.displayStatusMessage(`Error uploading files: ${error.message}`, 'error');
-      // Remove failed files from state
+      // Remove failed files from attachedFiles state
       this.setState(prevState => ({
-        attachedFiles: prevState.attachedFiles.filter(f => !files.includes(f))
+        attachedFiles: prevState.attachedFiles.filter(f => !newFilesToUpload.includes(f))
       }));
     } finally {
       // Clear loading states
       this.setState({ isLoading: false, isProcessingFiles: false });
+      // Clear the file input value to allow re-uploading the same file if needed after removal/error
+      event.target.value = null; 
     }
   };
 
@@ -345,6 +385,15 @@ class App extends Component {
     this.setState(prevState => ({
       filesDropdownOpen: !prevState.filesDropdownOpen
     }));
+  };
+
+  // Add a function to remove an attached file
+  removeAttachedFile = (indexToRemove) => {
+    this.setState(prevState => {
+      const updatedFiles = [...(prevState.attachedFiles || [])];
+      updatedFiles.splice(indexToRemove, 1);
+      return { attachedFiles: updatedFiles };
+    });
   };
 
   render() {
@@ -489,11 +538,7 @@ class App extends Component {
                         </div>
                         {/* Remove file button */}
                         <button 
-                          onClick={() => {
-                            const newFiles = [...attachedFiles];
-                            newFiles.splice(index, 1);
-                            this.setState({ attachedFiles: newFiles });
-                          }} 
+                          onClick={() => this.removeAttachedFile(index)} 
                           className={`${
                             darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                           } ml-2 flex-shrink-0 p-1 hover:bg-red-500 hover:text-white rounded-full transition-colors`}
