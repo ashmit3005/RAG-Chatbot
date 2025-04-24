@@ -171,8 +171,8 @@
 .bot-message ul, 
 .bot-message ol {
   margin-left: 1.25rem;
-  margin-top: 0.1rem;
-  margin-bottom: 0.1rem;
+  margin-top: 0.2rem; /* Slightly more space before list */
+  margin-bottom: 0.3rem; /* Slightly more space after list */
   padding-left: 1.5rem;
   list-style-position: outside;
 }
@@ -187,7 +187,7 @@
   margin: 0;
   padding: 0;
   line-height: 1.4;
-  display: list-item;
+  display: list-item; /* Ensure default list item behavior */
 }
 
 /* Force normal list display */
@@ -211,16 +211,33 @@
   display: none;
 }
 
-/* Make paragraphs inside list items inline with no margins */
+/* Make paragraphs inside list items inline by default, remove margins */
 .bot-message li p {
-  margin: 0;
-  padding: 0;
-  display: inline;
+  margin: 0 !important; /* Force remove margins */
+  padding: 0 !important; /* Force remove padding */
+  display: inline; /* Try making them inline first */
+}
+
+/* If a paragraph is the only child, let it be a block */
+.bot-message li > p:only-child {
+    display: block;
+}
+
+/* If a paragraph follows another element (like <strong>), make it block and add space */
+.bot-message li > *:not(p):not(br) + p {
+    display: block;
+    margin-top: 0.2em !important;
+}
+
+/* Space between consecutive paragraphs within a list item */
+.bot-message li > p + p {
+    display: block;
+    margin-top: 0.2em !important;
 }
 
 /* Clean spacing between list items */
 .bot-message li + li {
-  margin-top: 0.1rem;
+  margin-top: 0.2rem; /* Increase spacing slightly between items */
 }
 
 /* Extremely tight spacing between paragraphs and lists */

@@ -154,10 +154,11 @@ def load_single_document(file_path):
     try:
         loader = PyPDFLoader(file_path)
         docs = loader.load()
-        filename = os.path.basename(file_path)
+        filename = os.path.basename(file_path) # Get the base filename
         for doc in docs:
             doc.metadata['source'] = 'uploaded'
             doc.metadata['is_recent'] = True
+            doc.metadata['filename'] = filename # Add filename to metadata
             doc.page_content, entities = preprocess_text(doc.page_content, True)
             doc.metadata['entities'] = entities
             # Optionally create entity summary
@@ -170,22 +171,26 @@ def load_single_document(file_path):
         chunks = text_splitter.split_documents(docs)
         print(f"Created {len(chunks)} chunks from new document: {filename}")
         return chunks
-        
+
     except Exception as e:
         print(f"Error loading single file {os.path.basename(file_path)}: {e}")
         return []
 
-def update_vector_store(vectorstore, new_chunks, embedding_model):
-    """Update an existing vector store with new document chunks."""
+def update_vector_store(vector_store, new_chunks, embedding_model):
+    """Update the vector store with new document chunks."""
     if not new_chunks:
-        return vectorstore
+        print("No new chunks to add.")
+        return vector_store
+
     try:
-        vectorstore.add_documents(new_chunks)
-        print(f"Added {len(new_chunks)} new chunks to the vector store.")
-        return vectorstore
+        # Assuming vector_store is Chroma or compatible with add_documents
+        vector_store.add_documents(new_chunks)
+        print(f"Successfully added {len(new_chunks)} new chunks to the vector store.")
+        return vector_store
     except Exception as e:
         print(f"Error updating vector store: {e}")
-        return vectorstore
+        # Depending on the error, you might want to raise it or handle it differently
+        return vector_store # Return original store on error
 
 def generate_embeddings(chunks):
     # Using OpenAI's recommended embedding model
@@ -208,21 +213,30 @@ def format_response(text):
 
     # Convert Markdown to HTML using 'extra' extension for features like tables, fenced code blocks
     html = markdown.markdown(text, extensions=[ExtraExtension()])
-    
-    # Clean up common formatting issues from Markdown conversion
-    html = re.sub(r'<p>(.*?)</p>\s*<(ul|ol)', r'<p>\1</p><\2', html) # Fix paragraph before list spacing
-    html = re.sub(r'<p>\s*</p>', '', html) # Remove empty paragraphs
-    html = re.sub(r'</li>\s*<li>', r'</li><li>', html) # Fix list item spacing
-    html = re.sub(r'<li><p>(.*?)</p></li>', r'<li>\1</li>', html) # Remove paragraph tags inside list items
-    html = re.sub(r'</([uo]l)>\s*<p>', r'</\1><p>', html) # Fix spacing after lists
-    html = re.sub(r'<p><p>(.*?)</p></p>', r'<p>\1</p>', html) # Fix double paragraph wrapping
-    html = re.sub(r'</p>\s+<p>', r'</p><p>', html) # Remove extra whitespace between paragraphs
-    html = re.sub(r'(<br\s*/?>\s*){2,}', r'<br/>', html) # Consolidate multiple breaks
-    html = re.sub(r'<p>\s*<br\s*/?>', r'<p>', html) # Remove leading breaks in paragraphs
-    html = re.sub(r'<br\s*/?>\s*</p>', r'</p>', html) # Remove trailing breaks in paragraphs
-    
-    return html.strip()
 
+    # Clean up common formatting issues from Markdown conversion
+    # Remove empty <p> tags, especially those following <strong> inside <li>
+    html = re.sub(r'(<strong.*?>.*?</strong>)\s*<p>\s*</p>', r'\1', html, flags=re.IGNORECASE | re.DOTALL)
+    # General empty paragraph removal (handle potential attributes)
+    html = re.sub(r'<p(\s+[^>]*)?>\s*</p>', '', html, flags=re.IGNORECASE)
+
+    html = re.sub(r'<p>(.*?)</p>\s*<(ul|ol)', r'<p>\1</p><\2', html, flags=re.IGNORECASE | re.DOTALL) # Fix paragraph before list spacing
+    html = re.sub(r'</li>\s*<li>', r'</li><li>', html) # Fix list item spacing
+    # Make the rule removing <p> inside <li> more robust and handle potential attributes
+    html = re.sub(r'<li>\s*<p(\s+[^>]*)?>(.*?)</p>\s*</li>', r'<li>\2</li>', html, flags=re.IGNORECASE | re.DOTALL) # Remove paragraph tags inside list items
+    html = re.sub(r'</([uo]l)>\s*<p>', r'</\1><p>', html, flags=re.IGNORECASE | re.DOTALL) # Fix spacing after lists
+    html = re.sub(r'<p><p>(.*?)</p></p>', r'<p>\1</p>', html, flags=re.IGNORECASE | re.DOTALL) # Fix double paragraph wrapping
+    html = re.sub(r'</p>\s+<p>', r'</p><p>', html, flags=re.IGNORECASE) # Remove extra whitespace between paragraphs
+    html = re.sub(r'(<br\s*/?>\s*){2,}', r'<br/>', html, flags=re.IGNORECASE) # Consolidate multiple breaks
+    html = re.sub(r'<p>\s*<br\s*/?>', r'<p>', html, flags=re.IGNORECASE) # Remove leading breaks in paragraphs
+    html = re.sub(r'<br\s*/?>\s*</p>', r'</p>', html, flags=re.IGNORECASE) # Remove trailing breaks in paragraphs
+
+    # Attempt to remove paragraph tags wrapping list items if markdown creates <li><p>...</p></li>
+    # This is slightly different from the previous rule, targeting the wrapping <p> more generally inside li
+    html = re.sub(r'<li>\s*<p(\s+[^>]*)?>(.*?)</p>\s*</li>', r'<li>\2</li>', html, flags=re.IGNORECASE | re.DOTALL)
+
+
+    return html.strip()
 
 class WindowedChatMessageHistory(ChatMessageHistory):
     """Chat message history that maintains only a window of the most recent messages."""

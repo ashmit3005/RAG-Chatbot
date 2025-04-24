@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUp, faPlus, faSun, faMoon, faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import CloseIcon from '@mui/icons-material/Close'; // Ensure CloseIcon is imported if used in remove button
 
 class App extends Component {
   constructor(props) {
@@ -235,14 +236,10 @@ class App extends Component {
           const updatedProcessedNames = new Set([...processedFileNames, ...data.uploaded_files]);
           this.setState({
               processedFileNames: Array.from(updatedProcessedNames)
+              // Keep attachedFiles state as is, don't clear it here
           });
       }
 
-      // Clear attached files after successful send
-      this.setState({ 
-        attachedFiles: []
-        // Keep processedFileNames updated
-      });
     } catch (error) {
       console.error("Error sending message:", error);
       this.displayStatusMessage(`Error: ${error.message}`, 'error');
@@ -388,12 +385,49 @@ class App extends Component {
   };
 
   // Add a function to remove an attached file
-  removeAttachedFile = (indexToRemove) => {
-    this.setState(prevState => {
-      const updatedFiles = [...(prevState.attachedFiles || [])];
-      updatedFiles.splice(indexToRemove, 1);
-      return { attachedFiles: updatedFiles };
-    });
+  removeAttachedFile = async (indexToRemove) => {
+    const fileToRemove = this.state.attachedFiles[indexToRemove];
+    if (!fileToRemove) return;
+
+    const filename = fileToRemove.name;
+
+    this.setState({ isLoading: true }); // Indicate activity
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/delete_file/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to delete file: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      this.displayStatusMessage(result.message || `File '${filename}' deleted successfully.`, 'success');
+
+      // Update state only after successful backend deletion
+      this.setState(prevState => {
+        const updatedFiles = [...(prevState.attachedFiles || [])];
+        updatedFiles.splice(indexToRemove, 1);
+
+        // Also remove from processedFileNames if it was there
+        const updatedProcessedNames = (prevState.processedFileNames || []).filter(
+          name => name !== filename
+        );
+
+        return {
+          attachedFiles: updatedFiles,
+          processedFileNames: updatedProcessedNames,
+          isLoading: false // Reset loading state here
+        };
+      });
+
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      this.displayStatusMessage(`Error deleting file '${filename}': ${error.message}`, 'error');
+      this.setState({ isLoading: false }); // Reset loading state on error
+    }
   };
 
   render() {
@@ -474,19 +508,6 @@ class App extends Component {
                     ) : (
                       msg.text
                     )}
-                    {/* Display attached files for user messages */}
-                    {msg.files && msg.files.length > 0 && (
-                      <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/20">
-                        {msg.files.map((file, fileIndex) => (
-                          <div key={fileIndex} className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-purple-500 rounded-lg flex items-center justify-center">
-                              <AttachFileIcon className="text-white" fontSize="small" />
-                            </div>
-                            <span className="text-sm">{file.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               ))}
@@ -544,9 +565,7 @@ class App extends Component {
                           } ml-2 flex-shrink-0 p-1 hover:bg-red-500 hover:text-white rounded-full transition-colors`}
                           title="Remove file"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 111.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
+                          <CloseIcon fontSize="small" /> 
                         </button>
                       </div>
                     ))}
@@ -648,7 +667,7 @@ class App extends Component {
                       </div>
                     )}
                   </div>
-                </div>
+                </div>  
               </div>  
             </div>
           </motion.div>
