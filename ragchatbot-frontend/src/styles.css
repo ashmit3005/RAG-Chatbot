@@ -172,7 +172,7 @@
 .bot-message ol {
   margin-left: 1.25rem;
   margin-top: 0.2rem; /* Slightly more space before list */
-  margin-bottom: 0.3rem; /* Slightly more space after list */
+  margin-bottom: 0.1rem; /* Reduce space after list */
   padding-left: 1.5rem;
   list-style-position: outside;
 }
@@ -188,6 +188,12 @@
   padding: 0;
   line-height: 1.4;
   display: list-item; /* Ensure default list item behavior */
+}
+
+/* Ensure last list doesn't have bottom margin */
+.bot-message > ul:last-child,
+.bot-message > ol:last-child {
+  margin-bottom: 0;
 }
 
 /* Force normal list display */
@@ -235,6 +241,35 @@
     margin-top: 0.2em !important;
 }
 
+/* Style for list items identified as titles */
+.bot-message li.list-title-item {
+  list-style: none !important; /* Remove bullet/number */
+  margin-top: 0.75rem; /* Space above title */
+}
+
+/* Style the strong tag within the title item */
+.bot-message li.list-title-item > strong:first-child {
+  display: block; /* Make title take its own line */
+  /* Pull title left to align with text outside list (matches ol padding) */
+  margin-left: -1.75rem; 
+  margin-bottom: 0.2rem; /* Space between title and content below (if any within same li) */
+}
+/* Adjust left margin specifically for ul if needed (matches ul padding) */
+.bot-message ul > li.list-title-item > strong:first-child {
+  margin-left: -1.5rem; 
+}
+
+/* Adjust spacing for the list item immediately following a title item */
+.bot-message li.list-title-item + li {
+  margin-top: 0.1rem; /* Reduce space between title li and next li */
+}
+
+/* Prevent extra top margin if the very first item is a title */
+.bot-message > ol > li.list-title-item:first-child,
+.bot-message > ul > li.list-title-item:first-child {
+  margin-top: 0;
+}
+
 /* Clean spacing between list items */
 .bot-message li + li {
   margin-top: 0.2rem; /* Increase spacing slightly between items */
@@ -249,7 +284,7 @@
 /* Minimize space after lists */
 .bot-message ul + p,
 .bot-message ol + p {
-  margin-top: 0.2rem;
+  margin-top: 0.1rem; /* Reduce space before paragraph following a list */
 }
 
 /* Handle nested lists properly with minimal spacing */

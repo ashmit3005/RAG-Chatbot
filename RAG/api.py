@@ -52,7 +52,7 @@ def initialize_rag_pipeline():
         chunks = load_and_chunk_documents()
         global_embedding_model = generate_embeddings(chunks)
         global_vectorstore = create_vector_store(chunks, global_embedding_model)
-        global_rag_pipeline = build_rag_pipeline(global_vectorstore)
+        global_rag_pipeline = build_rag_pipeline(global_vectorstore, "gpt-4o")
     except Exception as e:
         global_rag_pipeline = None
         global_vectorstore = None

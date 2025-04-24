@@ -214,6 +214,10 @@ def format_response(text):
     # Convert Markdown to HTML using 'extra' extension for features like tables, fenced code blocks
     html = markdown.markdown(text, extensions=[ExtraExtension()])
 
+    # Add class to list items that start with <strong> for styling as titles
+    # Use a non-greedy match for attributes .*?
+    html = re.sub(r'<li(.*?)>\s*<strong', r'<li class="list-title-item"\1><strong', html, flags=re.IGNORECASE)
+
     # Clean up common formatting issues from Markdown conversion
     # Remove empty <p> tags, especially those following <strong> inside <li>
     html = re.sub(r'(<strong.*?>.*?</strong>)\s*<p>\s*</p>', r'\1', html, flags=re.IGNORECASE | re.DOTALL)
@@ -232,9 +236,11 @@ def format_response(text):
     html = re.sub(r'<br\s*/?>\s*</p>', r'</p>', html, flags=re.IGNORECASE) # Remove trailing breaks in paragraphs
 
     # Attempt to remove paragraph tags wrapping list items if markdown creates <li><p>...</p></li>
-    # This is slightly different from the previous rule, targeting the wrapping <p> more generally inside li
-    html = re.sub(r'<li>\s*<p(\s+[^>]*)?>(.*?)</p>\s*</li>', r'<li>\2</li>', html, flags=re.IGNORECASE | re.DOTALL)
+    # This rule was duplicated, removing the second instance.
+    # html = re.sub(r'<li>\s*<p(\s+[^>]*)?>(.*?)</p>\s*</li>', r'<li>\2</li>', html, flags=re.IGNORECASE | re.DOTALL)
 
+    # Remove any trailing <br> tags at the very end of the response
+    html = re.sub(r'(<br\s*/?>\s*)+$', '', html, flags=re.IGNORECASE)
 
     return html.strip()
 

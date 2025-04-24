@@ -356,9 +356,58 @@ class App extends Component {
   };
 
   // Clear saved state from localStorage and reload
-  clearSavedState = () => {
-    localStorage.removeItem('chatbotState');
-    window.location.reload();
+  clearSavedState = async () => {
+    const { processedFileNames } = this.state;
+    let allFilesDeletedSuccessfully = true;
+    let deletionErrors = [];
+
+    if (processedFileNames && processedFileNames.length > 0) {
+      this.setState({ isLoading: true }); // Show loading indicator
+
+      const deletePromises = processedFileNames.map(filename => 
+        fetch(`http://localhost:5000/api/delete_file/${encodeURIComponent(filename)}`, {
+          method: 'DELETE',
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => { throw new Error(err.detail || `Failed to delete ${filename}`); });
+          }
+          return response.json(); // Contains success message
+        })
+        .catch(error => {
+          console.error(`Error deleting file ${filename}:`, error);
+          deletionErrors.push(error.message);
+          allFilesDeletedSuccessfully = false; 
+        })
+      );
+
+      await Promise.allSettled(deletePromises); // Wait for all deletions to attempt
+
+      if (!allFilesDeletedSuccessfully) {
+        this.displayStatusMessage(`Error deleting some files: ${deletionErrors.join(', ')}`, 'error');
+      } else {
+        this.displayStatusMessage('All associated files deleted successfully.', 'success');
+      }
+    }
+
+    // Clear local storage and reset state regardless of deletion success/failure
+    localStorage.removeItem("chatState");
+    this.setState({
+      conversations: [{ name: "New Chat", messages: [] }],
+      activeConversation: 0,
+      input: "",
+      isLoading: false, // Turn off loading indicator
+      darkMode: this.state.darkMode, // Keep theme preference
+      isOpen: this.state.isOpen, // Keep sidebar state
+      attachedFiles: [], // Clear attached files list
+      processedFileNames: [], // Clear processed files list
+      isProcessingFiles: false, // Reset processing state
+      filesDropdownOpen: false, // Close dropdown
+      statusMessage: null, // Clear any previous status message
+    }, () => {
+      // Optionally, force a reload or further UI updates if needed
+      console.log("Chat history and associated files cleared.");
+    });
   };
 
   handleReaction = (messageId, reaction) => {
@@ -391,42 +440,59 @@ class App extends Component {
 
     const filename = fileToRemove.name;
 
-    this.setState({ isLoading: true }); // Indicate activity
+    // Only attempt backend deletion if the file was actually processed/uploaded
+    if (this.state.processedFileNames.includes(filename)) {
+      this.setState({ isLoading: true }); // Indicate activity
 
-    try {
-      const response = await fetch(`http://localhost:5000/api/delete_file/${encodeURIComponent(filename)}`, {
-        method: 'DELETE',
-      });
+      try {
+        const response = await fetch(`http://localhost:5000/api/delete_file/${encodeURIComponent(filename)}`, {
+          method: 'DELETE',
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `Failed to delete file: ${response.statusText}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Failed to delete file: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        this.displayStatusMessage(result.message || `File '${filename}' deleted successfully.`, 'success');
+
+        // Update state only after successful backend deletion
+        this.setState(prevState => {
+          const updatedFiles = [...(prevState.attachedFiles || [])];
+          updatedFiles.splice(indexToRemove, 1);
+
+          // Also remove from processedFileNames if it was there
+          const updatedProcessedNames = (prevState.processedFileNames || []).filter(
+            name => name !== filename
+          );
+
+          return {
+            attachedFiles: updatedFiles,
+            processedFileNames: updatedProcessedNames,
+            isLoading: false // Reset loading state here
+          };
+        });
+
+      } catch (error) {
+        console.error("Error deleting file:", error);
+        this.displayStatusMessage(`Error deleting file '${filename}': ${error.message}`, 'error');
+        this.setState({ isLoading: false }); // Reset loading state on error
       }
-
-      const result = await response.json();
-      this.displayStatusMessage(result.message || `File '${filename}' deleted successfully.`, 'success');
-
-      // Update state only after successful backend deletion
+    } else {
+      // If the file wasn't processed (e.g., just added to UI but upload failed or wasn't sent),
+      // simply remove it from the UI state without calling the backend.
       this.setState(prevState => {
         const updatedFiles = [...(prevState.attachedFiles || [])];
         updatedFiles.splice(indexToRemove, 1);
-
-        // Also remove from processedFileNames if it was there
-        const updatedProcessedNames = (prevState.processedFileNames || []).filter(
-          name => name !== filename
-        );
-
+        // No need to change processedFileNames here
         return {
           attachedFiles: updatedFiles,
-          processedFileNames: updatedProcessedNames,
-          isLoading: false // Reset loading state here
+          // isLoading should not be true in this case, but reset just in case
+          isLoading: false 
         };
       });
-
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      this.displayStatusMessage(`Error deleting file '${filename}': ${error.message}`, 'error');
-      this.setState({ isLoading: false }); // Reset loading state on error
+      this.displayStatusMessage(`Removed '${filename}' from the list (was not uploaded).`, 'info');
     }
   };
 
